@@ -1,0 +1,36 @@
+{
+  "name": "@auditor/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@auditor/ai": "workspace:*",
+    "@auditor/analyzer": "workspace:*",
+    "@auditor/browser": "workspace:*",
+    "@auditor/config": "workspace:*",
+    "@auditor/database": "workspace:*",
+    "@auditor/flow-engine": "workspace:*",
+    "@auditor/logger": "workspace:*",
+    "@auditor/shared": "workspace:*",
+    "@auditor/test-engine": "workspace:*",
+    "bullmq": "^5.56.4",
+    "dotenv": "^17.2.1",
+    "ioredis": "^5.7.0",
+    "playwright": "^1.55.0"
+  },
+  "devDependencies": {
+    "@auditor/fixture": "workspace:*",
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.4",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

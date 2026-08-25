@@ -1,0 +1,13 @@
+export { BrowserManager } from './manager.js';
+export { ensurePlaywrightBrowsersPath, resolveChromiumExecutable } from './browsers-path.js';
+export { PageObserver, type PageObservation } from './observer.js';
+export { DOMExtractor, AccessibilityExtractor } from './extractors.js';
+export { NetworkMonitor } from './network-monitor.js';
+export { ConsoleMonitor } from './console-monitor.js';
+export { ScreenshotManager } from './screenshot.js';
+export { SemanticExtractor } from './semantic-extractor.js';
+export { UsernamePasswordAuthenticator, installNavigationGuard } from './auth.js';
+export { waitForPageSettle, waitForSpaSettle, withNavigationRetry, isNavigationDestroyedError } from './stable-page.js';
+export { executeCandidateAction, locatorFromSelectors } from './execute.js';
+export { classifyActionRisk } from './risk.js';
+export { buildSelectorMeta } from './selectors.js';

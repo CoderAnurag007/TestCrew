@@ -1,0 +1,643 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum CredentialType {
+  USERNAME_PASSWORD
+}
+
+enum RunStatus {
+  QUEUED
+  INITIALIZING
+  AUTHENTICATING
+  DISCOVERING
+  EXPLORING
+  FINALIZING
+  GENERATING_TESTS
+  EXECUTING_TESTS
+  ANALYZING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ActionRisk {
+  SAFE
+  CAUTION
+  DESTRUCTIVE
+}
+
+enum RunStageStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum FindingSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
+}
+
+enum FindingStatus {
+  OPEN
+  CONFIRMED
+  IGNORED
+  RESOLVED
+  ACKNOWLEDGED
+  DISMISSED
+}
+
+enum FindingCategory {
+  BUG
+  UX
+  ACCESSIBILITY
+  SECURITY
+  PERFORMANCE
+  VISUAL
+}
+
+enum TestCategory {
+  HAPPY_PATH
+  NEGATIVE
+  VALIDATION
+  BOUNDARY
+  NAVIGATION
+  ERROR_HANDLING
+  PERMISSION
+  EMPTY_STATE
+  LOADING_STATE
+  RESPONSIVE
+  ACCESSIBILITY
+  REGRESSION
+}
+
+enum TestPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum EvidenceType {
+  SCREENSHOT
+  HTML
+  HAR
+  LOG
+  VIDEO
+  JSON
+}
+
+enum TestRunStatus {
+  PENDING
+  RUNNING
+  PASSED
+  FAILED
+  SKIPPED
+  ERROR
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships Membership[]
+  createdRuns Run[]        @relation("RunCreatedBy")
+  auditLogs   AuditLog[]
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships  Membership[]
+  projects     Project[]
+  environments Environment[]
+  credentials  Credential[]
+  runs         Run[]
+  runStages    RunStage[]
+  pages        Page[]
+  states       State[]
+  stateEdges   StateEdge[]
+  actions      Action[]
+  flows        Flow[]
+  testCases    TestCase[]
+  testRuns     TestRun[]
+  findings     Finding[]
+  evidence     Evidence[]
+  reports      Report[]
+  auditLogs    AuditLog[]
+  runEvents    RunEvent[]
+  aiUsages     AiUsage[]
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  organizationId String
+  userId         String
+  role           MembershipRole
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@index([organizationId])
+}
+
+model Project {
+  id                   String   @id @default(cuid())
+  organizationId       String
+  name                 String
+  description          String?
+  baseUrl              String
+  maxPages             Int      @default(40)
+  maxActions           Int      @default(80)
+  maxDepth             Int      @default(8)
+  maxDurationMs        Int      @default(300000)
+  allowDestructive     Boolean  @default(false)
+  allowPrivateTargets  Boolean  @default(false)
+  recordVideo          Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  environments Environment[]
+  credentials  Credential[]
+  runs         Run[]
+  pages        Page[]
+  flows        Flow[]
+  testCases    TestCase[]
+  findings     Finding[]
+  reports      Report[]
+
+  @@index([organizationId])
+}
+
+model Environment {
+  id             String   @id @default(cuid())
+  organizationId String
+  projectId      String
+  name           String
+  baseUrl        String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runs         Run[]
+
+  @@unique([projectId, name])
+  @@index([organizationId])
+  @@index([projectId])
+}
+
+model Credential {
+  id               String         @id @default(cuid())
+  organizationId   String
+  projectId        String
+  name             String
+  type             CredentialType
+  username         String
+  secretCiphertext String?
+  secretRef        String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([projectId])
+}
+
+model Run {
+  id                 String     @id @default(cuid())
+  organizationId     String
+  projectId          String
+  environmentId      String?
+  status             RunStatus  @default(QUEUED)
+  errorMessage       String?
+  createdById        String
+  queueJobId         String?
+  currentUrl         String?
+  currentAction      String?
+  pagesDiscovered    Int        @default(0)
+  statesDiscovered   Int        @default(0)
+  actionsExecuted    Int        @default(0)
+  flowsDiscovered    Int        @default(0)
+  lastScreenshotKey     String?
+  storageStateKey       String?
+  aiCostUsd             Float     @default(0)
+  browserDurationMs     Int       @default(0)
+  storageBytesEstimate  Int       @default(0)
+  qualityScore          Float?
+  testsGenerated        Int       @default(0)
+  testsPassed           Int       @default(0)
+  testsFailed           Int       @default(0)
+  startedAt             DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  environment  Environment? @relation(fields: [environmentId], references: [id], onDelete: SetNull)
+  createdBy    User         @relation("RunCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  stages       RunStage[]
+  pages        Page[]
+  states       State[]
+  stateEdges   StateEdge[]
+  actions      Action[]
+  flows        Flow[]
+  testCases    TestCase[]
+  testRuns     TestRun[]
+  findings     Finding[]
+  evidence     Evidence[]
+  report       Report?
+  events       RunEvent[]
+  aiUsages     AiUsage[]
+
+  @@index([organizationId])
+  @@index([projectId, createdAt])
+  @@index([status])
+}
+
+model RunStage {
+  id             String         @id @default(cuid())
+  organizationId String
+  runId          String
+  name           String
+  status         RunStageStatus @default(PENDING)
+  errorMessage   String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([runId])
+}
+
+model Page {
+  id              String   @id @default(cuid())
+  organizationId  String
+  runId           String
+  projectId       String
+  url             String
+  title           String?
+  screenshotKey   String?
+  domStorageKey   String?
+  a11yStorageKey  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  states       State[]
+  findings     Finding[]
+
+  @@index([organizationId])
+  @@index([runId])
+  @@index([projectId])
+}
+
+model State {
+  id             String   @id @default(cuid())
+  organizationId String
+  runId          String
+  pageId         String
+  name           String
+  fingerprint    String
+  url            String?
+  title          String?
+  screenshotKey  String?
+  metadata       Json?
+  visited        Boolean  @default(false)
+  depth          Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  page         Page         @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  outgoing     StateEdge[]  @relation("StateEdgeFrom")
+  incoming     StateEdge[]  @relation("StateEdgeTo")
+
+  @@unique([runId, fingerprint])
+  @@index([organizationId])
+  @@index([pageId])
+}
+
+model StateEdge {
+  id             String   @id @default(cuid())
+  organizationId String
+  runId          String
+  fromStateId    String
+  toStateId      String
+  actionId       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  fromState    State        @relation("StateEdgeFrom", fields: [fromStateId], references: [id], onDelete: Cascade)
+  toState      State        @relation("StateEdgeTo", fields: [toStateId], references: [id], onDelete: Cascade)
+  action       Action?      @relation(fields: [actionId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([runId])
+  @@index([fromStateId])
+  @@index([toStateId])
+}
+
+model Action {
+  id                 String      @id @default(cuid())
+  organizationId     String
+  runId              String
+  type               String
+  selector           String?
+  value              String?
+  target             String?
+  input              String?
+  sourceStateId      String?
+  destinationStateId String?
+  success            Boolean?
+  durationMs         Int?
+  riskLevel          ActionRisk  @default(SAFE)
+  reason             String?
+  label              String?
+  category           String?
+  href               String?
+  selectors          Json?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  edges        StateEdge[]
+
+  @@index([organizationId])
+  @@index([runId])
+}
+
+model Flow {
+  id             String   @id @default(cuid())
+  organizationId String
+  runId          String
+  projectId      String
+  name           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  testCases    TestCase[]
+
+  @@index([organizationId])
+  @@index([runId])
+  @@index([projectId])
+}
+
+model TestCase {
+  id                String       @id @default(cuid())
+  organizationId    String
+  runId             String
+  projectId         String
+  flowId            String?
+  name              String
+  description       String?
+  category          TestCategory @default(HAPPY_PATH)
+  priority          TestPriority @default(MEDIUM)
+  risk              ActionRisk   @default(SAFE)
+  preconditions     Json?
+  steps             Json
+  expectedResults   Json
+  promptVersion     String?
+  model             String?
+  promptTokens      Int?
+  completionTokens  Int?
+  latencyMs         Int?
+  estimatedCostUsd  Float?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  flow         Flow?        @relation(fields: [flowId], references: [id], onDelete: SetNull)
+  testRuns     TestRun[]
+
+  @@index([organizationId])
+  @@index([runId])
+  @@index([projectId])
+}
+
+model TestRun {
+  id                    String        @id @default(cuid())
+  organizationId        String
+  runId                 String
+  testCaseId            String
+  status                TestRunStatus @default(PENDING)
+  errorMessage          String?
+  durationMs            Int?
+  retryCount            Int           @default(0)
+  screenshotBeforeKey   String?
+  screenshotFailureKey  String?
+  screenshotAfterKey    String?
+  traceKey              String?
+  videoKey              String?
+  consoleKey            String?
+  networkKey            String?
+  assertions            Json?
+  actualResults         Json?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  testCase     TestCase     @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  findings     Finding[]
+  evidence     Evidence[]
+
+  @@index([organizationId])
+  @@index([runId])
+  @@index([testCaseId])
+}
+
+model Finding {
+  id                   String          @id @default(cuid())
+  organizationId       String
+  runId                String
+  projectId            String
+  testRunId            String?
+  pageId               String?
+  duplicateOfId        String?
+  title                String
+  description          String
+  severity             FindingSeverity
+  status               FindingStatus   @default(OPEN)
+  category             FindingCategory
+  confidence           Float           @default(0.5)
+  expected             String?
+  actual               String?
+  recommendation       String?
+  steps                Json?
+  signature            String?
+  component            String?
+  url                  String?
+  rootCauseHypothesis  String?
+  mergedCount          Int             @default(1)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  testRun      TestRun?     @relation(fields: [testRunId], references: [id], onDelete: SetNull)
+  page         Page?        @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  duplicateOf  Finding?     @relation("FindingDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates   Finding[]    @relation("FindingDuplicates")
+  evidence     Evidence[]
+
+  @@index([organizationId])
+  @@index([runId])
+  @@index([projectId])
+  @@index([status, severity])
+  @@index([signature])
+  @@index([duplicateOfId])
+}
+
+model Evidence {
+  id             String       @id @default(cuid())
+  organizationId String
+  runId          String
+  findingId      String?
+  testRunId      String?
+  type           EvidenceType
+  storageKey     String
+  contentType    String
+  fileName       String?
+  byteLength     Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  finding      Finding?     @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  testRun      TestRun?     @relation(fields: [testRunId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([runId])
+  @@index([findingId])
+  @@index([testRunId])
+}
+
+model Report {
+  id                String   @id @default(cuid())
+  organizationId    String
+  runId             String   @unique
+  projectId         String
+  qualityScore      Float?
+  summary           String?
+  payload           Json?
+  promptVersion     String?
+  model             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([projectId])
+}
+
+model RunEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  runId          String
+  kind           String
+  message        String
+  url            String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([runId, createdAt])
+}
+
+model AiUsage {
+  id               String   @id @default(cuid())
+  organizationId   String
+  runId            String
+  purpose          String
+  promptVersion    String?
+  model            String
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  latencyMs        Int      @default(0)
+  estimatedCostUsd Float    @default(0)
+  createdAt        DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([runId])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  userId         String?
+  action         String
+  resourceType   String
+  resourceId     String?
+  metadata       Json?
+  ipAddress      String?
+  requestId      String?
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([createdAt])
+}
