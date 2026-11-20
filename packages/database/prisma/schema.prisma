@@ -16,6 +16,30 @@ enum MembershipRole {
 
 enum CredentialType {
   USERNAME_PASSWORD
+  STORAGE_STATE
+}
+
+enum SafetyMode {
+  READ_ONLY
+  FULL
+}
+
+enum EnvironmentKind {
+  PRODUCTION
+  STAGING
+}
+
+enum FindingChange {
+  NEW
+  RECURRING
+  REGRESSED
+}
+
+enum FailureClass {
+  APP_BUG
+  TEST_BUG
+  ENVIRONMENT
+  FLAKY
 }
 
 enum RunStatus {
@@ -129,6 +153,10 @@ model Organization {
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
+  brandName     String?
+  brandLogoUrl  String?
+  brandColor    String?
+  brandFooter   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -182,11 +210,31 @@ model Project {
   allowDestructive     Boolean  @default(false)
   allowPrivateTargets  Boolean  @default(false)
   recordVideo          Boolean  @default(false)
+  safetyMode           SafetyMode @default(READ_ONLY)
+  verificationToken    String?
+  verifiedHost         String?
+  verifiedAt           DateTime?
+  resetHookUrl         String?
+  intents              Json       @default("[]")
+  testPlan             Json       @default("{}")
+  verifiedHosts        Json       @default("[]")
+  blockedPathPatterns  Json       @default("[]")
+  monitorCadence       String?
+  monitorHourUtc       Int        @default(6)
+  monitorWeekday       Int        @default(1)
+  monitorEnvironmentId String?
+  monitorDevices       Json       @default("[\"desktop\"]")
+  nextMonitorAt        DateTime?
+  alertSettings        Json       @default("{}")
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  environments Environment[]
+  suppressions FindingSuppression[]
+  testHistory  TestHistory[]
+  apiTokens    ApiToken[]
+  environments Environment[]
+  integrations ProjectIntegration[]
   credentials  Credential[]
   runs         Run[]
   pages        Page[]
@@ -204,6 +252,8 @@ model Environment {
   projectId      String
   name           String
   baseUrl        String
+  kind           EnvironmentKind @default(PRODUCTION)
+  safetyMode     SafetyMode?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -259,6 +309,16 @@ model Run {
   testsGenerated        Int       @default(0)
   testsPassed           Int       @default(0)
   testsFailed           Int       @default(0)
+  testsFlaky            Int       @default(0)
+  baseUrlOverride       String?
+  effectiveSafetyMode   SafetyMode?
+  replayOfRunId         String?
+  previousRunId         String?
+  trigger               String    @default("manual")
+  device                String    @default("desktop")
+  shareToken            String?   @unique
+  sharedAt              DateTime?
+  alertsSentAt          DateTime?
   startedAt             DateTime?
   completedAt           DateTime?
   createdAt             DateTime  @default(now())
@@ -284,7 +344,8 @@ model Run {
 
   @@index([organizationId])
   @@index([projectId, createdAt])
-  @@index([status])
+  @@index([status])
+  @@index([status, createdAt])
 }
 
 model RunStage {
@@ -443,6 +504,10 @@ model TestCase {
   preconditions     Json?
   steps             Json
   expectedResults   Json
+  testKey           String?
+  source            String       @default("generated")
+  intentId          String?
+  quarantined       Boolean      @default(false)
   promptVersion     String?
   model             String?
   promptTokens      Int?
@@ -472,6 +537,7 @@ model TestRun {
   errorMessage          String?
   durationMs            Int?
   retryCount            Int           @default(0)
+  failureClass          FailureClass?
   screenshotBeforeKey   String?
   screenshotFailureKey  String?
   screenshotAfterKey    String?
@@ -520,6 +586,10 @@ model Finding {
   url                  String?
   rootCauseHypothesis  String?
   mergedCount          Int             @default(1)
+  change               FindingChange   @default(NEW)
+  suppressed           Boolean         @default(false)
+  ticketProvider       String?
+  ticketUrl            String?
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 
@@ -640,4 +710,76 @@ model AuditLog {
   @@index([organizationId])
   @@index([userId])
   @@index([createdAt])
+}
+
+model FindingSuppression {
+  id             String   @id @default(cuid())
+  organizationId String
+  projectId      String
+  signature      String
+  title          String
+  reason         String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, signature])
+  @@index([organizationId])
+}
+
+model TestHistory {
+  id             String    @id @default(cuid())
+  organizationId String
+  projectId      String
+  testKey        String
+  name           String
+  passes         Int       @default(0)
+  failures       Int       @default(0)
+  flakes         Int       @default(0)
+  quarantined    Boolean   @default(false)
+  lastStatus     String?
+  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, testKey])
+  @@index([organizationId])
+}
+
+model ApiToken {
+  id             String    @id @default(cuid())
+  organizationId String
+  projectId      String
+  name           String
+  tokenHash      String    @unique
+  prefix         String
+  createdById    String
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([projectId])
+}
+
+/// Alert channels (slack, webhook) and ticket trackers (github, jira, linear).
+/// `config` holds the non-secret settings; the token or webhook URL is encrypted.
+model ProjectIntegration {
+  id               String   @id @default(cuid())
+  organizationId   String
+  projectId        String
+  provider         String
+  config           Json     @default("{}")
+  secretCiphertext String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, provider])
+  @@index([organizationId])
 }

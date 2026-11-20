@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { actionRiskSchema, findingCategorySchema, findingSeveritySchema, testCategorySchema, testPrioritySchema } from './enums.js';
-import { selectorMetaSchema } from './semantic.js';
+import { fieldConstraintsSchema, selectorMetaSchema } from './semantic.js';
 
 export const testStepTypeSchema = z.enum([
   'navigate',
@@ -10,6 +10,9 @@ export const testStepTypeSchema = z.enum([
   'upload',
   'wait',
   'assert',
+  'reload',
+  'back',
+  'capture',
 ]);
 export type TestStepType = z.infer<typeof testStepTypeSchema>;
 
@@ -24,6 +27,7 @@ export const assertionKindSchema = z.enum([
   'http',
   'console_error',
   'page_error',
+  'element_text',
 ]);
 export type AssertionKind = z.infer<typeof assertionKindSchema>;
 
@@ -52,6 +56,12 @@ export const testStepSchema = z.object({
   assertion: assertionSpecSchema.optional(),
   discoveredActionId: z.string().optional(),
   discoveredElementId: z.string().optional(),
+  /** For `capture` steps: variable name later referenced as {{name}} or {{name+1}}. */
+  captureAs: z
+    .string()
+    .regex(/^[a-zA-Z_]\w{0,39}$/)
+    .optional(),
+  captureMode: z.enum(['text', 'count', 'value']).optional(),
 });
 export type TestStep = z.infer<typeof testStepSchema>;
 
@@ -67,6 +77,11 @@ export const generatedTestCaseSchema = z.object({
   flowName: z.string().optional(),
   requiresAuth: z.boolean().optional(),
   viewport: z.enum(['desktop', 'tablet', 'mobile']).optional(),
+  /** Where the test came from: planner, AI generation, a user intent, or a consistency check. */
+  source: z.enum(['generated', 'ai', 'intent', 'consistency']).optional(),
+  intentId: z.string().optional(),
+  /** True when the test changes data in the target app (create/edit/submit). */
+  mutates: z.boolean().optional(),
 });
 export type GeneratedTestCase = z.infer<typeof generatedTestCaseSchema>;
 
@@ -74,6 +89,14 @@ export const generatedTestSuiteSchema = z.object({
   tests: z.array(generatedTestCaseSchema),
 });
 export type GeneratedTestSuite = z.infer<typeof generatedTestSuiteSchema>;
+
+export const intentSchema = z.object({
+  id: z.string().min(1).max(64),
+  text: z.string().min(3).max(1000),
+  enabled: z.boolean().default(true),
+});
+export type Intent = z.infer<typeof intentSchema>;
+export const intentListSchema = z.array(intentSchema).max(100);
 
 export const discoveredElementSchema = z.object({
   id: z.string(),
@@ -87,6 +110,7 @@ export const discoveredElementSchema = z.object({
   riskLevel: actionRiskSchema,
   inputType: z.string().nullable().optional(),
   selectors: selectorMetaSchema,
+  constraints: fieldConstraintsSchema.optional(),
 });
 export type DiscoveredElement = z.infer<typeof discoveredElementSchema>;
 

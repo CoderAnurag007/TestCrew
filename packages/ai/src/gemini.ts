@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { estimateCostUsd } from './cost.js';
 import type { AIProvider, StructuredGenerationRequest, StructuredGenerationResult } from './provider.js';
 import type { AiCompletion, AiCompletionRequest, ImageAnalysisRequest } from './types.js';
+import { fetchWithRetry } from './retry.js';
 
 export function parseJsonContent(content: string): unknown {
   const trimmed = content
@@ -89,6 +90,8 @@ export class GeminiProvider implements AIProvider {
       json,
       temperature: request.temperature,
       maxTokens: request.maxTokens,
+      timeoutMs: request.timeoutMs,
+      retries: request.retries,
     });
   }
 
@@ -100,11 +103,13 @@ export class GeminiProvider implements AIProvider {
       json: boolean;
       temperature?: number;
       maxTokens?: number;
+      timeoutMs?: number;
+      retries?: number;
     },
   ): Promise<AiCompletion> {
     const started = Date.now();
     const root = this.options.baseUrl ?? 'https://generativelanguage.googleapis.com/v1beta';
-    const response = await fetch(`${root}/models/${encodeURIComponent(model)}:generateContent`, {
+    const response = await fetchWithRetry(`${root}/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -119,7 +124,7 @@ export class GeminiProvider implements AIProvider {
           ...(input.json ? { responseMimeType: 'application/json' } : {}),
         },
       }),
-    });
+    }, { timeoutMs: input.timeoutMs, retries: input.retries });
     if (!response.ok) {
       const body = await response.text();
       throw new Error(`Gemini request failed (${response.status}): ${body}`);

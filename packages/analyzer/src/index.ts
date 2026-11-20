@@ -10,8 +10,10 @@ export { DuplicateDetector, findingSignature, normalizeTitle, tokenSimilarity } 
 export { ConfidenceCalculator } from './confidence.js';
 export { AccessibilityAnalyzer } from './accessibility.js';
 export { VisualAnalyzer, VIEWPORT_PROFILES } from './visual.js';
-export { calculateQualityScore, coverageFrom } from './scoring.js';
+export { calculateQualityScore, coverageFrom, scoreBreakdown, SEVERITY_WEIGHTS, type ScoreBreakdown, type ScoreInput } from './scoring.js';
+export { diffRuns, serializeDiff, type DiffFinding, type FindingChangeKind, type RunDiff, type SerializedRunDiff } from './diff.js';
 export { ReportGenerator, type ReportPayload } from './report.js';
+export { renderHtmlReport, esc as escapeHtml, type HtmlReportInput, type HtmlReportFinding } from './html-report.js';
 
 export class S3CompatibleStorage implements ObjectStorage {
   private readonly client: S3Client;

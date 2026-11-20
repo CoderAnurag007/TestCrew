@@ -22,6 +22,19 @@ interface RawElement {
   hasPopup: boolean;
   inNavigation: boolean;
   box: { x: number; y: number; width: number; height: number } | null;
+  constraints: {
+    required: boolean | null;
+    min: string | null;
+    max: string | null;
+    minLength: number | null;
+    maxLength: number | null;
+    pattern: string | null;
+    autocomplete: string | null;
+    formId: string | null;
+    formMethod: string | null;
+    formAction: string | null;
+    value: string | null;
+  } | null;
 }
 
 const EXTRACT_SCRIPT = `(() => {
@@ -113,8 +126,52 @@ const EXTRACT_SCRIPT = `(() => {
       hasPopup: el.getAttribute('aria-haspopup') === 'true' || el.getAttribute('aria-haspopup') === 'menu',
       inNavigation: inNavigation,
       box: { x: box.x, y: box.y, width: box.width, height: box.height },
+      constraints: (() => {
+        const tag = el.tagName.toLowerCase();
+        if (tag !== 'input' && tag !== 'select' && tag !== 'textarea' && tag !== 'button') return null;
+        const form = el.form || el.closest('form');
+        const num = (value) => (typeof value === 'number' && value >= 0 ? value : null);
+        const type = (el.getAttribute('type') || '').toLowerCase();
+        const sensitive = type === 'password' || /card|cvv|cvc|otp/i.test((el.getAttribute('name') || '') + ' ' + (el.getAttribute('autocomplete') || ''));
+        return {
+          required: el.required === true || el.getAttribute('aria-required') === 'true',
+          min: el.getAttribute('min'),
+          max: el.getAttribute('max'),
+          minLength: num(el.minLength),
+          maxLength: num(el.maxLength),
+          pattern: el.getAttribute('pattern'),
+          autocomplete: el.getAttribute('autocomplete'),
+          formId: form ? (form.id || form.getAttribute('action') || 'form-' + Array.from(document.forms).indexOf(form)) : null,
+          formMethod: form ? (form.getAttribute('method') || 'get').toLowerCase() : null,
+          formAction: form ? new URL(form.getAttribute('action') || location.href, location.href).pathname : null,
+          value: sensitive || tag === 'button' ? null : (typeof el.value === 'string' ? el.value.slice(0, 200) : null),
+        };
+      })(),
     };
   });
+})()`;
+
+const PAGE_EXTRAS_SCRIPT = `(() => {
+  const broken = [];
+  for (const img of Array.from(document.images)) {
+    if (!img.complete) continue;
+    const src = img.currentSrc || img.src;
+    if (!src || src.startsWith('data:')) continue;
+    const style = window.getComputedStyle(img);
+    if (style.display === 'none' || style.visibility === 'hidden') continue;
+    if (img.naturalWidth === 0) broken.push(src);
+  }
+  const items = [];
+  const rows = document.querySelectorAll('main table tbody tr, table tbody tr, [role="row"], main li, [class*="product"] [class*="title"], [class*="product-name"], [class*="card"] h2, [class*="card"] h3');
+  for (const row of Array.from(rows).slice(0, 60)) {
+    if (row.closest('nav, header, footer, aside, [role="navigation"]')) continue;
+    const cell = (row.querySelector('td, [role="cell"], a, h2, h3') || row).cloneNode(true);
+    for (const control of Array.from(cell.querySelectorAll('button, input, select, textarea, svg, [role="button"]'))) control.remove();
+    const text = ((cell.textContent || '') + '').replace(/\\s+/g, ' ').trim();
+    if (text.length >= 3 && text.length <= 60 && !items.includes(text)) items.push(text);
+    if (items.length >= 12) break;
+  }
+  return { broken: Array.from(new Set(broken)).slice(0, 40), items };
 })()`;
 
 const HEADING_SCRIPT = `(() => {
@@ -159,6 +216,10 @@ export class SemanticExtractor {
     );
     const importantText = (await page.evaluate(HEADING_SCRIPT)) as string[];
     const contentSignature = (await page.evaluate(CONTENT_SCRIPT)) as string;
+    const extras = (await page.evaluate(PAGE_EXTRAS_SCRIPT).catch(() => ({ broken: [], items: [] }))) as {
+      broken: string[];
+      items: string[];
+    };
 
     const elements: SemanticElement[] = raw.map((item) => {
       const selectors = buildSelectorMeta({
@@ -196,6 +257,7 @@ export class SemanticExtractor {
           name: item.name,
           type: item.inputType,
         }),
+        ...(item.constraints ? { constraints: item.constraints } : {}),
       };
     });
 
@@ -207,6 +269,8 @@ export class SemanticExtractor {
       importantText,
       contentSignature,
       elements,
+      brokenImages: extras.broken,
+      listItems: extras.items,
     };
   }
 }

@@ -47,7 +47,9 @@ export class ExplorerAgent {
                 title: input.page.title,
                 route: input.page.route,
                 modalOpen: input.page.modalOpen,
-                elements: input.page.elements.map((element) => ({
+                // Large pages (stores, catalogs) have thousands of elements; the choice
+                // only needs the visible ones, and a smaller prompt answers much faster.
+                elements: input.page.elements.filter((element) => element.visible && element.enabled).slice(0, 120).map((element) => ({
                   id: element.id,
                   type: element.type,
                   role: element.role,
@@ -58,7 +60,7 @@ export class ExplorerAgent {
                   enabled: element.enabled,
                 })),
               },
-              actions: available.map((action) => ({
+              actions: available.slice(0, 80).map((action) => ({
                 id: action.id,
                 type: action.type,
                 label: action.label,
@@ -73,6 +75,8 @@ export class ExplorerAgent {
         ],
         temperature: 0,
         maxTokens: 400,
+        timeoutMs: 20_000,
+        retries: 1,
       });
       const parsed = explorerDecisionSchema.parse(parseJsonContent(completion.content));
       if (!parsed.chosenActionId || !available.some((action) => action.id === parsed.chosenActionId)) {

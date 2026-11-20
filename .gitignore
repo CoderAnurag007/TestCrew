@@ -21,3 +21,10 @@ apps/web/next-env.d.ts
 .vscode/*
 !.vscode/extensions.json
 !*.example
+
+# local audit output
+apps/worker/audit-results/
+apps/worker/benchmark-results/
+
+# local UI test login
+.local-test-account.txt

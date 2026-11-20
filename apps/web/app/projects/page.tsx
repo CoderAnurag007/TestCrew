@@ -1,28 +1,36 @@
 'use client';
 
 import Link from 'next/link';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { Building2, FolderPlus, Plus } from 'lucide-react';
+import type { Run } from '@auditor/shared';
 import { AppShell } from '@/components/layout/app-shell';
 import { useSession } from '@/components/session-provider';
+import { CreateProjectDialog } from '@/components/pages/create-project-dialog';
+import {
+  byNewest,
+  fullDate,
+  hostOf,
+  timeAgo,
+  refetchWhileRunning,
+} from '@/components/pages/format';
+import { SafetyBadge } from '@/components/pages/project-header';
+import { NEW_PROJECT_EVENT, NEW_PROJECT_FLAG, useOpenSignal } from '@/components/shell/events';
+import { RunStatusDot, ScorePill } from '@/components/status';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { projectApi } from '@/lib/queries';
-import { ApiError } from '@/lib/api';
+import { Card } from '@/components/ui/card';
+import { EmptyState, PageHeader, Skeleton } from '@/components/ui/premium';
+import { projectApi, runApi } from '@/lib/queries';
+import { cn } from '@/lib/utils';
+
+const COLUMNS = 'md:grid-cols-[minmax(0,1.3fr)_minmax(0,1.2fr)_150px_56px_96px]';
 
 export default function ProjectsPage() {
-  const { currentOrg } = useSession();
-  const queryClient = useQueryClient();
+  const { currentOrg, isLoading: sessionLoading } = useSession();
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [baseUrl, setBaseUrl] = useState('');
-  const [environmentName, setEnvironmentName] = useState('Production');
+
+  useOpenSignal(NEW_PROJECT_EVENT, NEW_PROJECT_FLAG, () => setOpen(true), !sessionLoading);
 
   const projects = useQuery({
     queryKey: ['projects', currentOrg?.id],
@@ -30,115 +38,151 @@ export default function ProjectsPage() {
     enabled: Boolean(currentOrg),
   });
 
-  const create = useMutation({
-    mutationFn: projectApi.create,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['projects', currentOrg?.id] });
-      setOpen(false);
-      setName('');
-      setDescription('');
-      setBaseUrl('');
-      setEnvironmentName('Production');
-      toast.success('Project created');
-    },
-    onError: (error) => toast.error(error instanceof ApiError ? error.message : 'Could not create project'),
+  const runQueries = useQueries({
+    queries: (projects.data ?? []).map((project) => ({
+      queryKey: ['runs', project.id],
+      queryFn: () => runApi.list(project.id),
+      refetchInterval: refetchWhileRunning,
+    })),
   });
+  const latestRun = new Map<string, Run | undefined>();
+  const runsLoaded = new Map<string, boolean>();
+  (projects.data ?? []).forEach((project, index) => {
+    const result = runQueries[index];
+    runsLoaded.set(project.id, Boolean(result?.isFetched));
+    latestRun.set(project.id, result?.data ? [...result.data].sort(byNewest)[0] : undefined);
+  });
+
+  const count = projects.data?.length ?? 0;
 
   return (
     <AppShell>
-      <div className="mb-8 flex items-end justify-between">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Inventory</p>
-          <h1 className="text-3xl font-semibold tracking-tight">Projects</h1>
-        </div>
-        <Button disabled={!currentOrg} onClick={() => setOpen(true)}>
-          New project
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow={currentOrg?.name ?? 'Projects'}
+        title="Projects"
+        description="Each project is one web app TestCrew audits, with its own environments, credentials and safety rules."
+        actions={
+          <Button disabled={!currentOrg} onClick={() => setOpen(true)}>
+            <Plus />
+            New project
+          </Button>
+        }
+        className="mb-8"
+      />
 
-      {!currentOrg ? (
-        <p className="text-sm text-muted-foreground">Create a workspace before adding projects.</p>
-      ) : projects.data?.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No applications yet</CardTitle>
-            <CardDescription>Point Auditor at a URL and it will become the unit of audit work.</CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {projects.data?.map((project) => (
-            <Link key={project.id} href={`/projects/${project.id}`}>
-              <Card className="h-full transition-colors hover:border-primary/40">
-                <CardHeader>
-                  <CardTitle>{project.name}</CardTitle>
-                  <CardDescription className="mono">{project.baseUrl}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{project.description ?? 'No description'}</p>
-                </CardContent>
-              </Card>
-            </Link>
+      {!sessionLoading && !currentOrg ? (
+        <EmptyState
+          icon={Building2}
+          title="Create a workspace first"
+          description="Workspaces hold your projects, secrets and audit history. Create one from the Overview page."
+          action={
+            <Button asChild>
+              <Link href="/dashboard?workspace=1">Create workspace</Link>
+            </Button>
+          }
+        />
+      ) : projects.isLoading || sessionLoading ? (
+        <div
+          className="divide-y divide-border overflow-hidden rounded-lg border border-border"
+          aria-busy="true"
+          aria-label="Loading projects"
+        >
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="px-5 py-3.5">
+              <Skeleton className="h-5 w-full" />
+            </div>
           ))}
+        </div>
+      ) : projects.isError ? (
+        <Card className="p-5">
+          <p className="text-sm text-danger" role="alert">
+            Could not load projects. Refresh the page to try again.
+          </p>
+        </Card>
+      ) : count === 0 ? (
+        <EmptyState
+          icon={FolderPlus}
+          title="No projects yet"
+          description="Add the URL of an app you want audited. TestCrew starts in read-only mode, so nothing in your app changes."
+          action={
+            <Button onClick={() => setOpen(true)}>
+              <Plus />
+              Create your first project
+            </Button>
+          }
+        />
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-border bg-card">
+          <div
+            className={cn(
+              'hidden h-9 items-center gap-4 border-b border-border bg-well px-5 text-[13px] text-muted-foreground md:grid',
+              COLUMNS,
+            )}
+            aria-hidden
+          >
+            <span>Project</span>
+            <span>URL</span>
+            <span>Last run</span>
+            <span>Score</span>
+            <span className="text-right">Run at</span>
+          </div>
+          <ul className="divide-y divide-border">
+            {projects.data?.map((project) => {
+              const run = latestRun.get(project.id);
+              const loaded = runsLoaded.get(project.id);
+              return (
+                <li key={project.id}>
+                  <Link
+                    href={`/projects/${project.id}`}
+                    className={cn(
+                      'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-3 transition-colors hover:bg-well focus-visible:bg-well focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cobalt',
+                      COLUMNS,
+                    )}
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-sm font-medium text-ink">{project.name}</span>
+                      {project.safetyMode === 'FULL' ? (
+                        <SafetyBadge mode={project.safetyMode} />
+                      ) : null}
+                    </div>
+                    <span
+                      className="mono order-3 col-span-2 truncate text-xs text-muted-foreground md:order-none md:col-span-1 md:text-[13px]"
+                      title={project.baseUrl}
+                    >
+                      {hostOf(project.baseUrl)}
+                    </span>
+                    <div className="justify-self-end md:justify-self-start">
+                      {run ? (
+                        <RunStatusDot status={run.status} />
+                      ) : loaded ? (
+                        <span className="text-[13px] text-muted-foreground">Not audited yet</span>
+                      ) : (
+                        <Skeleton className="h-5 w-24" />
+                      )}
+                    </div>
+                    <div className="hidden md:block">
+                      {run ? <ScorePill score={run.qualityScore} /> : <ScorePill score={null} />}
+                    </div>
+                    <div
+                      className="hidden text-right text-[13px] text-muted-foreground md:block"
+                      title={run ? fullDate(run.createdAt) : undefined}
+                    >
+                      {run ? timeAgo(run.createdAt) : '–'}
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create project</DialogTitle>
-            <DialogDescription>Register an application URL and its first environment.</DialogDescription>
-          </DialogHeader>
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!currentOrg) {
-                return;
-              }
-              create.mutate({
-                organizationId: currentOrg.id,
-                name,
-                description: description || undefined,
-                baseUrl,
-                environmentName,
-              });
-            }}
-          >
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="url">Application URL</Label>
-              <Input
-                id="url"
-                type="url"
-                placeholder="https://app.example.com"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="env">Environment</Label>
-              <Input
-                id="env"
-                value={environmentName}
-                onChange={(e) => setEnvironmentName(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" disabled={create.isPending}>
-              Create project
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <CreateProjectDialog
+        open={open}
+        onOpenChange={setOpen}
+        organizationId={currentOrg?.id}
+        openAfterCreate
+      />
     </AppShell>
   );
 }

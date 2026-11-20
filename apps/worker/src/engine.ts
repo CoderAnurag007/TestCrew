@@ -1,14 +1,20 @@
 import type { ObjectStorage } from '@auditor/analyzer';
-import type { ExplorerAgent, ModelRouter } from '@auditor/ai';
+import { RecordingExplorer, type ExplorerLike, type ModelRouter, type RecordedDecision } from '@auditor/ai';
 import {
   BrowserManager,
   executeCandidateAction,
-  installNavigationGuard,
+  locatorFromSelectors,
+  installSafetyGuard,
   PageObserver,
   UsernamePasswordAuthenticator,
   waitForPageSettle,
   waitForSpaSettle,
+  LiveStreamer,
+  type LiveAction,
+  type SafetyGuard,
+  runWithDevice,
 } from '@auditor/browser';
+import { asStringArray, callResetHook, resolveSafetyMode } from './safety-mode.js';
 import type { Prisma, PrismaClient, SecretStore } from '@auditor/database';
 import {
   ActionExtractor,
@@ -33,6 +39,20 @@ import { assertSafeNavigationTarget, UnsafeTargetError } from '@auditor/shared/s
 import { UnrecoverableError } from 'bullmq';
 import type { BrowserContext, Page } from 'playwright';
 
+/** Writes the newest live frame and its metadata where the API can serve them. */
+export function createLivePublisher(deps: Pick<AuditDependencies, 'storage'>, runId: string, phase: () => string) {
+  return async (frame: { seq: number; at: string; url: string; viewport: { width: number; height: number }; action: LiveAction | null; jpeg: Buffer }) => {
+    await deps.storage.put({ key: `runs/${runId}/live/frame.jpg`, body: frame.jpeg, contentType: 'image/jpeg' });
+    await deps.storage.put({
+      key: `runs/${runId}/live/meta.json`,
+      body: Buffer.from(
+        JSON.stringify({ seq: frame.seq, at: frame.at, url: frame.url, viewport: frame.viewport, action: frame.action, phase: phase() }),
+      ),
+      contentType: 'application/json',
+    });
+  };
+}
+
 export interface QueuePort {
   add(name: string, data: unknown, opts?: { jobId?: string }): Promise<unknown>;
 }
@@ -47,7 +67,7 @@ export interface AuditDependencies {
   prisma: PrismaClient;
   secrets: SecretStore;
   storage: ObjectStorage;
-  explorer: ExplorerAgent;
+  explorer: ExplorerLike;
   ai?: ModelRouter;
   explorationQueue?: QueuePort;
   logger: AuditLogger;
@@ -82,10 +102,18 @@ export async function setRunStatus(
   status: RunStatus,
   extra: Record<string, unknown> = {},
 ): Promise<void> {
-  await prisma.run.update({
-    where: { id: runId },
+  // A run the user cancelled stays cancelled: later stages of an in-flight
+  // audit must never overwrite that status.
+  await prisma.run.updateMany({
+    where: { id: runId, status: { not: 'CANCELLED' } },
     data: { status, ...extra },
   });
+}
+
+/** True when the user cancelled the run (or it no longer exists). */
+export async function isRunCancelled(prisma: PrismaClient, runId: string): Promise<boolean> {
+  const run = await prisma.run.findUnique({ where: { id: runId }, select: { status: true } });
+  return !run || run.status === 'CANCELLED';
 }
 
 export async function completeStage(
@@ -152,6 +180,16 @@ export async function executeAuditRun(
   job: AuditJobData,
   options: { signal?: AbortSignal } = {},
 ): Promise<void> {
+  // Every browser opened during this run uses the run's device (desktop, phone, Safari, iPhone).
+  const target = await deps.prisma.run.findUnique({ where: { id: job.runId }, select: { device: true } });
+  return runWithDevice(target?.device, () => executeAuditRunOnDevice(deps, job, options));
+}
+
+async function executeAuditRunOnDevice(
+  deps: AuditDependencies,
+  job: AuditJobData,
+  options: { signal?: AbortSignal } = {},
+): Promise<void> {
   const run = await deps.prisma.run.findUnique({
     where: { id: job.runId },
     include: { project: true, environment: true },
@@ -160,7 +198,7 @@ export async function executeAuditRun(
     return;
   }
 
-  const targetUrl = run.environment?.baseUrl ?? run.project.baseUrl;
+  const targetUrl = run.baseUrlOverride ?? run.environment?.baseUrl ?? run.project.baseUrl;
   const limits: ExplorationLimits = {
     maxPages: run.project.maxPages,
     maxActions: run.project.maxActions,
@@ -172,6 +210,9 @@ export async function executeAuditRun(
   const manager = new BrowserManager();
   let context: BrowserContext | undefined;
   let page: Page | undefined;
+  let guard: SafetyGuard | undefined;
+  let livePhase = 'starting';
+  const live = new LiveStreamer(createLivePublisher(deps, job.runId, () => livePhase), { fps: 2 });
 
   try {
     await setRunStatus(deps.prisma, run.id, 'INITIALIZING', { startedAt: run.startedAt ?? new Date() });
@@ -191,9 +232,61 @@ export async function executeAuditRun(
       throw new UnrecoverableError(message);
     }
 
-    context = await manager.createContext();
+    const safety = await resolveSafetyMode({
+      // An environment can override the project's mode (e.g. production read-only, staging full).
+      requested: run.environment?.safetyMode ?? run.project.safetyMode,
+      targetUrl,
+      verifiedHost: run.project.verifiedHost,
+      verifiedAt: run.project.verifiedAt,
+      verifiedHosts: asStringArray(run.project.verifiedHosts),
+      allowPrivate: run.project.allowPrivateTargets,
+    });
+    await deps.prisma.run.update({ where: { id: run.id }, data: { effectiveSafetyMode: safety.mode } });
+    await appendEvent(deps.prisma, {
+      organizationId: run.organizationId,
+      runId: run.id,
+      kind: safety.downgraded ? 'warning' : 'info',
+      message: safety.message,
+      url: targetUrl,
+    });
+    if (safety.mode === 'FULL' && run.project.resetHookUrl) {
+      await callResetHook(deps, {
+        runId: run.id,
+        organizationId: run.organizationId,
+        url: run.project.resetHookUrl,
+        allowPrivate: run.project.allowPrivateTargets,
+      });
+    }
+
+    const credential = await deps.prisma.credential.findFirst({
+      where: { projectId: run.projectId, organizationId: run.organizationId },
+      // A saved session (STORAGE_STATE) wins over a password: it is how SSO/MFA apps are audited.
+      orderBy: [{ type: 'desc' }, { createdAt: 'asc' }],
+    });
+    let presetStorageState: unknown;
+    if (credential?.type === 'STORAGE_STATE') {
+      if (!credential.secretCiphertext) {
+        throw new UnrecoverableError('Stored session is missing its encrypted state');
+      }
+      try {
+        presetStorageState = JSON.parse(await deps.secrets.decrypt(credential.secretCiphertext));
+      } catch {
+        throw new UnrecoverableError('Stored session could not be decrypted or is not valid JSON');
+      }
+    }
+
+    context = await manager.createContext(presetStorageState ? { storageState: presetStorageState as never } : {});
+    guard = await installSafetyGuard(context, {
+      mode: safety.mode,
+      allowPrivate: run.project.allowPrivateTargets,
+      targetOrigin: new URL(targetUrl).origin,
+      blockedPathPatterns: asStringArray(run.project.blockedPathPatterns),
+    });
+    guard.setPhase('auth');
     page = await manager.createPage(context);
-    await installNavigationGuard(page, { allowPrivate: run.project.allowPrivateTargets });
+    await live.attach(page);
+    livePhase = 'opening';
+    await live.setAction({ kind: 'navigate', label: `Opening ${targetUrl}` });
     const observer = new PageObserver();
     observer.attach(page);
 
@@ -232,12 +325,21 @@ export async function executeAuditRun(
       url: page.url(),
     });
 
+    livePhase = 'authenticating';
+    await live.setAction({ kind: 'info', label: 'Checking whether a login is needed' });
     const authenticator = new UsernamePasswordAuthenticator();
     const login = await authenticator.detectLogin(page);
-    const credential = await deps.prisma.credential.findFirst({
-      where: { projectId: run.projectId, organizationId: run.organizationId },
-      orderBy: { createdAt: 'asc' },
-    });
+
+    if (login.detected && credential?.type === 'STORAGE_STATE') {
+      await setRunStatus(deps.prisma, run.id, 'FAILED', {
+        errorMessage:
+          'AUTHENTICATION_REQUIRED: the saved browser session was rejected (it has probably expired). Upload a fresh storage state.',
+        currentAction: 'authentication-required',
+        currentUrl: page.url(),
+        completedAt: new Date(),
+      });
+      throw new UnrecoverableError('Saved browser session was rejected; a login page is still shown');
+    }
 
     if (login.detected && !credential) {
       const screenshotKey = `runs/${run.id}/login.png`;
@@ -264,7 +366,7 @@ export async function executeAuditRun(
       );
     }
 
-    if (credential) {
+    if (credential && credential.type !== 'STORAGE_STATE') {
       if (credential.type !== 'USERNAME_PASSWORD') {
         await setRunStatus(deps.prisma, run.id, 'AUTHENTICATING', {
           errorMessage: `AUTHENTICATION_REQUIRED: unsupported authentication type ${credential.type}`,
@@ -303,6 +405,7 @@ export async function executeAuditRun(
     }
 
     await completeStage(deps.prisma, { organizationId: run.organizationId, runId: run.id, name: 'authenticate' });
+    guard.setPhase('audit');
 
     const storageState = await context.storageState();
     const storageStateKey = `runs/${run.id}/storage-state.json`;
@@ -316,15 +419,67 @@ export async function executeAuditRun(
       data: { storageStateKey },
     });
 
-    await discoverAndExplore(deps, {
-      runId: run.id,
-      organizationId: run.organizationId,
-      projectId: run.projectId,
-      page,
-      observer,
-      limits,
-      signal: options.signal,
-    });
+    let replay: RecordedDecision[] = [];
+    if (run.replayOfRunId) {
+      try {
+        replay = JSON.parse(
+          (await deps.storage.get(`runs/${run.replayOfRunId}/ai-decisions.json`)).toString('utf8'),
+        ) as RecordedDecision[];
+        await appendEvent(deps.prisma, {
+          organizationId: run.organizationId,
+          runId: run.id,
+          kind: 'info',
+          message: `Replaying ${replay.length} recorded exploration decisions from run ${run.replayOfRunId}`,
+        });
+      } catch {
+        await appendEvent(deps.prisma, {
+          organizationId: run.organizationId,
+          runId: run.id,
+          kind: 'warning',
+          message: `Run ${run.replayOfRunId} has no recorded decisions; exploring normally`,
+        });
+      }
+    }
+    const recorder = new RecordingExplorer(deps.explorer, replay);
+    const activeGuard = guard;
+    livePhase = 'exploring';
+
+    await discoverAndExplore(
+      { ...deps, explorer: recorder },
+      {
+        runId: run.id,
+        organizationId: run.organizationId,
+        projectId: run.projectId,
+        page,
+        observer,
+        limits,
+        signal: options.signal,
+        live,
+        beforePipeline: async () => {
+          livePhase = 'testing';
+          await live.setAction({ kind: 'info', label: 'Exploration finished. Generating tests' });
+          await live.stop();
+          await deps.storage.put({
+            key: `runs/${run.id}/ai-decisions.json`,
+            body: Buffer.from(JSON.stringify(recorder.recorded)),
+            contentType: 'application/json',
+          });
+          await deps.storage.put({
+            key: `runs/${run.id}/blocked-requests.json`,
+            body: Buffer.from(JSON.stringify(activeGuard.blocked)),
+            contentType: 'application/json',
+          });
+          if (run.replayOfRunId) {
+            await appendEvent(deps.prisma, {
+              organizationId: run.organizationId,
+              runId: run.id,
+              kind: 'info',
+              message: `Replay reused ${recorder.replayHits} recorded decisions; ${recorder.replayMisses} screens differed and were explored fresh`,
+            });
+          }
+        },
+      },
+    );
   } catch (error) {
     if (error instanceof AuthenticationRequiredError) {
       await appendEvent(deps.prisma, {
@@ -355,6 +510,7 @@ export async function executeAuditRun(
     }
     throw error;
   } finally {
+    await live.stop().catch(() => undefined);
     await context?.close().catch(() => undefined);
     await manager.close().catch(() => undefined);
   }
@@ -370,6 +526,8 @@ async function discoverAndExplore(
     observer: PageObserver;
     limits: ExplorationLimits;
     signal?: AbortSignal;
+    beforePipeline?: () => Promise<void>;
+    live?: LiveStreamer;
   },
 ): Promise<void> {
   const graph = new StateGraph();
@@ -407,7 +565,8 @@ async function discoverAndExplore(
         JSON.stringify({
           console: observation.console,
           networkFailures: observation.networkFailures,
-          pageErrors: observation.pageErrors,
+          pageErrors: observation.pageErrors.map((item) => item.text),
+          brokenImages: observation.semantic.brokenImages ?? [],
           url: observation.semantic.url,
         }),
       ),
@@ -455,6 +614,8 @@ async function discoverAndExplore(
           importantText: observation.semantic.importantText,
           contentSignature: observation.semantic.contentSignature,
           elements: observation.semantic.elements,
+          listItems: observation.semantic.listItems ?? [],
+          brokenImages: observation.semantic.brokenImages ?? [],
         },
       availableActionKeys: actions.map((action) => action.stableKey),
     });
@@ -476,6 +637,8 @@ async function discoverAndExplore(
           importantText: observation.semantic.importantText,
           contentSignature: observation.semantic.contentSignature,
           elements: observation.semantic.elements,
+          listItems: observation.semantic.listItems ?? [],
+          brokenImages: observation.semantic.brokenImages ?? [],
         },
         visited: false,
         depth: depthValue,
@@ -491,6 +654,8 @@ async function discoverAndExplore(
           importantText: observation.semantic.importantText,
           contentSignature: observation.semantic.contentSignature,
           elements: observation.semantic.elements,
+          listItems: observation.semantic.listItems ?? [],
+          brokenImages: observation.semantic.brokenImages ?? [],
         },
       },
     });
@@ -564,6 +729,47 @@ async function discoverAndExplore(
   const tried = new Set<string>();
   const preferKeys = new Set<string>();
   let current = initial;
+  // Screens seen so far and the actions they offered, so the explorer can go back
+  // to a screen with untried actions when it reaches a dead end (an error page,
+  // a screen without navigation) instead of stopping.
+  const frontier = new Map<string, { url: string; actions: CandidateAction[] }>();
+  const backtrackVisits = new Map<string, number>();
+  frontier.set(initial.fingerprint, { url: initial.observation.semantic.url, actions: initial.actions });
+
+  const explorable = (action: CandidateAction) =>
+    !tried.has(action.stableKey) &&
+    !blocked.has(action.stableKey) &&
+    action.category !== 'chrome' &&
+    action.category !== 'other' &&
+    (action.type !== 'fill' || action.category === 'search');
+
+  const backtrack = async (): Promise<typeof initial | null> => {
+    for (const [fingerprint, entry] of frontier) {
+      if (fingerprint === current.fingerprint) continue;
+      if ((backtrackVisits.get(fingerprint) ?? 0) >= 2) continue;
+      if (!entry.actions.some(explorable)) continue;
+      backtrackVisits.set(fingerprint, (backtrackVisits.get(fingerprint) ?? 0) + 1);
+      try {
+        await input.page.goto(entry.url, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+        await waitForSpaSettle(input.page);
+      } catch {
+        continue;
+      }
+      actionsExecuted += 1;
+      await input.live?.setAction({ kind: 'navigate', label: `Back to ${entry.url}` });
+      await appendEvent(deps.prisma, {
+        organizationId: input.organizationId,
+        runId: input.runId,
+        kind: 'info',
+        message: `Went back to ${entry.url} to explore what is left there`,
+        url: entry.url,
+      });
+      const observed = await persistObservation(graph.listStates().length);
+      frontier.set(observed.fingerprint, { url: observed.observation.semantic.url, actions: observed.actions });
+      return observed;
+    }
+    return null;
+  };
 
   const sameOriginHref = (href: string): string | null => {
     try {
@@ -633,7 +839,12 @@ async function discoverAndExplore(
                 );
     if (available.length === 0) {
       graph.markVisited(current.fingerprint);
-      break;
+      const next = await backtrack();
+      if (!next) {
+        break;
+      }
+      current = next;
+      continue;
     }
 
     const decision = await deps.explorer.choose({
@@ -661,6 +872,17 @@ async function discoverAndExplore(
       url: input.page.url(),
     });
 
+    if (input.live) {
+      const box =
+        chosen.type === 'goto' || chosen.type === 'dismiss'
+          ? null
+          : await LiveStreamer.boxOf(locatorFor(input.page, chosen));
+      await input.live.setAction({
+        kind: chosen.type === 'fill' ? 'type' : chosen.type === 'select' ? 'select' : chosen.type === 'goto' ? 'navigate' : 'click',
+        label: actionSummary,
+        box,
+      });
+    }
     const keysBefore = new Set(current.actions.map((action) => action.stableKey));
     const viewBefore = current.fingerprint;
     const started = Date.now();
@@ -788,9 +1010,20 @@ async function discoverAndExplore(
         pagesDiscovered: Math.max(visitedPages.size, graph.listStates().length),
       },
     });
+    frontier.set(after.fingerprint, { url: after.observation.semantic.url, actions: after.actions });
     current = after;
   }
 
+  if (await isRunCancelled(deps.prisma, input.runId)) {
+    await input.live?.setAction({ kind: 'info', label: 'Run cancelled' });
+    await appendEvent(deps.prisma, {
+      organizationId: input.organizationId,
+      runId: input.runId,
+      kind: 'info',
+      message: 'Run cancelled; stopped before generating tests',
+    });
+    return;
+  }
   await completeStage(deps.prisma, { organizationId: input.organizationId, runId: input.runId, name: 'explore' });
   await setRunStatus(deps.prisma, input.runId, 'FINALIZING');
   await startStage(deps.prisma, { organizationId: input.organizationId, runId: input.runId, name: 'finalize' });
@@ -846,6 +1079,7 @@ async function discoverAndExplore(
     },
   });
 
+  await input.beforePipeline?.();
   const { runPostExplorationPipeline } = await import('./pipeline.js');
   await runPostExplorationPipeline(deps, {
     runId: input.runId,
@@ -876,4 +1110,8 @@ export async function processExploreStateJob(
   if (run.status === 'QUEUED' || run.status === 'INITIALIZING' || run.status === 'AUTHENTICATING') {
     await executeAuditRun(deps, data);
   }
+}
+
+function locatorFor(page: Page, action: CandidateAction) {
+  return locatorFromSelectors(page, action.selectors).first();
 }

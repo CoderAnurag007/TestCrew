@@ -1,3 +1,4 @@
+export * from './bugs.js';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { pathToFileURL } from 'node:url';
 
@@ -10,7 +11,7 @@ interface UserRow {
   email: string;
 }
 
-function layout(title: string, body: string, authenticated: boolean): string {
+function layout(title: string, body: string, authenticated: boolean, cartCount = 0): string {
   const nav = authenticated
     ? `<nav data-testid="app-nav">
         <a data-testid="nav-dashboard" href="/dashboard">Dashboard</a>
@@ -18,6 +19,9 @@ function layout(title: string, body: string, authenticated: boolean): string {
         <a data-testid="nav-settings" href="/settings">Settings</a>
         <a data-testid="nav-account" href="/account">Account</a>
         <a data-testid="nav-reports" href="/reports">Reports</a>
+        <a data-testid="nav-shop" href="/shop">Shop</a>
+        <a data-testid="nav-store" href="/store">Store</a>
+        <a data-testid="nav-cart" href="/store/cart" aria-label="Cart, ${cartCount} items">Cart (${cartCount})</a>
         <button data-testid="logout" type="submit" form="logout-form">Log out</button>
         <form id="logout-form" method="post" action="/logout"></form>
       </nav>`
@@ -61,6 +65,8 @@ function readBody(req: IncomingMessage): Promise<string> {
 
 export interface FixtureServer {
   url: string;
+  /** Every non-GET request the fixture received, so tests can prove read-only audits changed nothing. */
+  mutations: Array<{ method: string; path: string }>;
   close: () => Promise<void>;
 }
 
@@ -70,14 +76,29 @@ export async function startFixture(port = 0): Promise<FixtureServer> {
     { id: '2', name: 'Grace Hopper', email: 'grace@example.com' },
   ];
 
+  const mutations: Array<{ method: string; path: string }> = [];
+  const products = [
+    { id: '1', name: 'Trail Water Bottle', price: 12.5 },
+    { id: '2', name: 'Summit Backpack', price: 30 },
+    { id: '3', name: 'Camp Mug', price: 8 },
+  ];
+  const cart: Array<{ productId: string; size: string; qty: number }> = [];
+  const orders: Array<{ id: string; total: number; email: string }> = [];
+  let checkoutDetails: Record<string, string> | null = null;
+  const money = (value: number) => `$${value.toFixed(2)}`;
+  const cartItems = () => cart.reduce((sum, line) => sum + line.qty, 0);
+  const IMG = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="140"><rect width="200" height="140" fill="#c7d2fe"/></svg>').toString('base64');
   const server: Server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+    if (req.method && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      mutations.push({ method: req.method, path: url.pathname });
+    }
     const cookies = parseCookies(req.headers.cookie);
     const authenticated = cookies.session === 'ok';
 
     const html = (status: number, title: string, body: string, extraHeaders: Record<string, string> = {}) => {
       res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', ...extraHeaders });
-      res.end(layout(title, body, authenticated));
+      res.end(layout(title, body, authenticated, cartItems()));
     };
 
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/login')) {
@@ -138,6 +159,7 @@ export async function startFixture(port = 0): Promise<FixtureServer> {
            <p>Systems operational</p>
            <button data-testid="close-modal" type="button" onclick="document.querySelector('[data-testid=modal]').hidden=true">Close</button>
          </div>
+         <p><a data-testid="help-link" href="/help">Help center</a></p>
          <form data-testid="search-form" action="/users" method="get">
            <input data-testid="search" name="q" placeholder="Search users" />
            <button data-testid="search-submit" type="submit">Search</button>
@@ -146,10 +168,12 @@ export async function startFixture(port = 0): Promise<FixtureServer> {
     }
 
     if (url.pathname === '/users' && req.method === 'GET') {
-      const query = url.searchParams.get('q')?.toLowerCase() ?? '';
-      const rows = users.filter(
-        (user) => !query || user.name.toLowerCase().includes(query) || user.email.toLowerCase().includes(query),
-      );
+      // PLANTED BUG B7: search is case-sensitive, so "ada" does not find "Ada Lovelace".
+      const query = url.searchParams.get('q') ?? '';
+      // PLANTED BUG B8: the list silently shows only the first two users and has no pagination.
+      const rows = users
+        .filter((user) => !query || user.name.includes(query) || user.email.includes(query))
+        .slice(0, 2);
       return html(
         200,
         'Users',
@@ -262,6 +286,249 @@ export async function startFixture(port = 0): Promise<FixtureServer> {
       return;
     }
 
+    if (url.pathname === '/shop') {
+      // PLANTED BUG B9: "Add to cart" increases the cart count by 2 instead of 1.
+      return html(
+        200,
+        'Shop',
+        `<h1 data-testid="page-title">Shop</h1>
+         <p>Cart: <span data-testid="cart-count">0</span> items</p>
+         <ul data-testid="products">
+           <li>Blue Mug <button data-testid="add-blue-mug" type="button" onclick="const c=document.querySelector('[data-testid=cart-count]'); c.textContent=String(Number(c.textContent)+2)">Add to cart</button></li>
+         </ul>`,
+      );
+    }
+
+    /* ------------------------------ store ------------------------------ */
+    if (url.pathname === '/store' && req.method === 'GET') {
+      return html(
+        200,
+        'Store',
+        `<h1 data-testid="page-title">Store</h1>
+         <div data-testid="product-grid">
+           ${products
+             .map(
+               (product) => `<div class="product-card">
+                 <a href="/store/p/${product.id}"><img src="${IMG}" alt="${product.name}" width="200" height="140" /></a>
+                 <h3><a href="/store/p/${product.id}">${product.name}</a></h3>
+                 <p class="price">${money(product.price)}</p>
+               </div>`,
+             )
+             .join('')}
+         </div>`,
+      );
+    }
+
+    const productMatch = url.pathname.match(/^\/store\/p\/(\d+)$/);
+    if (productMatch && req.method === 'GET') {
+      const product = products.find((item) => item.id === productMatch[1]);
+      if (!product) {
+        res.writeHead(404, { 'content-type': 'text/plain' });
+        res.end('Not found');
+        return;
+      }
+      // PLANTED BUG B15: the size guide closes with its x button but ignores Escape.
+      // PLANTED BUG B16: "Compare" does nothing.
+      return html(
+        200,
+        product.name,
+        `<h1>${product.name}</h1>
+         <img src="${IMG}" alt="${product.name}" width="400" height="280" />
+         <p class="price" data-testid="price">${money(product.price)}</p>
+         <form method="post" action="/store/cart/add">
+           <input type="hidden" name="productId" value="${product.id}" />
+           <label>Size
+             <select name="size" required>
+               <option value="">Select a size</option>
+               <option value="S">Small</option>
+               <option value="M">Medium</option>
+             </select>
+           </label>
+           <button type="submit" data-testid="add-to-cart">Add to cart</button>
+         </form>
+         <button type="button" data-testid="size-guide" onclick="document.getElementById('size-guide').hidden=false">Size guide</button>
+         <button type="button" data-testid="compare">Compare</button>
+         <div id="size-guide" role="dialog" aria-modal="true" aria-label="Size guide" hidden style="position:fixed;top:20%;left:30%;width:40%;min-height:200px;background:#fff;border:1px solid #ccc;z-index:50;padding:16px">
+           <h2>Size guide</h2>
+           <p>Small fits 1 litre. Medium fits 2 litres.</p>
+           <button type="button" aria-label="Close" onclick="document.getElementById('size-guide').hidden=true">×</button>
+         </div>`,
+      );
+    }
+
+    if (url.pathname === '/store/cart/add' && req.method === 'POST') {
+      const params = new URLSearchParams(await readBody(req));
+      const productId = params.get('productId') ?? '';
+      const size = params.get('size') ?? '';
+      if (!products.some((item) => item.id === productId) || !size) {
+        return html(400, 'Choose a size', '<h1>Choose a size</h1><p role="alert">Please choose a size first.</p>');
+      }
+      const existing = cart.find((line) => line.productId === productId && line.size === size);
+      if (existing) existing.qty += 1;
+      else cart.push({ productId, size, qty: 1 });
+      res.writeHead(302, { location: '/store/cart' });
+      res.end();
+      return;
+    }
+
+    if (url.pathname === '/store/cart/update' && req.method === 'POST') {
+      const params = new URLSearchParams(await readBody(req));
+      cart.forEach((line, index) => {
+        const qty = Number(params.get(`qty-${index}`) ?? line.qty);
+        if (Number.isFinite(qty) && qty > 0) line.qty = Math.min(99, Math.floor(qty));
+      });
+      res.writeHead(302, { location: '/store/cart' });
+      res.end();
+      return;
+    }
+
+    if (url.pathname === '/store/cart/remove' && req.method === 'POST') {
+      const params = new URLSearchParams(await readBody(req));
+      const index = Number(params.get('index'));
+      if (Number.isInteger(index) && index >= 0) cart.splice(index, 1);
+      res.writeHead(302, { location: '/store/cart' });
+      res.end();
+      return;
+    }
+
+    if (url.pathname === '/store/cart' && req.method === 'GET') {
+      if (cart.length === 0) {
+        return html(200, 'Cart', '<h1>Your cart</h1><p>Your cart is empty.</p><a href="/store">Continue shopping</a>');
+      }
+      // PLANTED BUG B14: the subtotal adds unit prices and ignores quantities.
+      const subtotal = cart.reduce((sum, line) => sum + (products.find((item) => item.id === line.productId)?.price ?? 0), 0);
+      const shipping = 5;
+      return html(
+        200,
+        'Cart',
+        `<h1>Your cart</h1>
+         <form method="post" action="/store/cart/update">
+           <table data-testid="cart-table">
+             <thead><tr><th>Product</th><th>Price</th><th>Quantity</th><th>Total</th></tr></thead>
+             <tbody>
+               ${cart
+                 .map((line, index) => {
+                   const product = products.find((item) => item.id === line.productId)!;
+                   return `<tr>
+                     <td><a href="/store/p/${product.id}">${product.name}</a> (${line.size})</td>
+                     <td>${money(product.price)}</td>
+                     <td><input type="number" name="qty-${index}" value="${line.qty}" min="1" aria-label="Quantity for ${product.name}" /></td>
+                     <td>${money(product.price * line.qty)}</td>
+                   </tr>`;
+                 })
+                 .join('')}
+             </tbody>
+           </table>
+           <button type="submit">Update cart</button>
+         </form>
+         ${cart.map((_line, index) => `<form method="post" action="/store/cart/remove"><input type="hidden" name="index" value="${index}" /><button type="submit">Remove</button></form>`).join('')}
+         <dl>
+           <div><dt>Subtotal</dt> <dd>${money(subtotal)}</dd></div>
+           <div><dt>Shipping</dt> <dd>${money(shipping)}</dd></div>
+           <div><dt>Total</dt> <dd>${money(subtotal + shipping)}</dd></div>
+         </dl>
+         <a href="/store/checkout">Proceed to checkout</a>`,
+      );
+    }
+
+    if (url.pathname === '/store/checkout' && req.method === 'GET') {
+      return html(
+        200,
+        'Checkout',
+        `<h1>Checkout</h1>
+         <form method="post" action="/store/checkout">
+           <label>First name <input name="firstName" autocomplete="given-name" required /></label>
+           <label>Last name <input name="lastName" autocomplete="family-name" required /></label>
+           <label>Email <input type="email" name="email" autocomplete="email" required /></label>
+           <label>Address <input name="address1" autocomplete="address-line1" required /></label>
+           <label>City <input name="city" autocomplete="address-level2" required /></label>
+           <label>Postal code <input name="postalCode" autocomplete="postal-code" required /></label>
+           <label>Country
+             <select name="country" required>
+               <option value="">Select a country</option>
+               <option value="US">United States</option>
+               <option value="IN">India</option>
+             </select>
+           </label>
+           <button type="submit">Continue to payment</button>
+         </form>`,
+      );
+    }
+
+    if (url.pathname === '/store/checkout' && req.method === 'POST') {
+      const params = new URLSearchParams(await readBody(req));
+      const details = Object.fromEntries(params.entries());
+      if (!details.email || !details.address1 || !details.country) {
+        return html(400, 'Checkout', '<h1>Checkout</h1><p role="alert">Please fill in every field.</p>');
+      }
+      checkoutDetails = details;
+      res.writeHead(302, { location: '/store/payment' });
+      res.end();
+      return;
+    }
+
+    if (url.pathname === '/store/payment' && req.method === 'GET') {
+      const total = cart.reduce((sum, line) => sum + (products.find((item) => item.id === line.productId)?.price ?? 0) * line.qty, 0) + 5;
+      return html(
+        200,
+        'Payment',
+        `<h1>Payment</h1>
+         <script>window.TESTPAY = { publishableKey: 'pk_test_fixture000' };</script>
+         <p>Amount due: <strong>${money(total)}</strong></p>
+         <form method="post" action="/store/pay">
+           <label>Card number <input name="cardnumber" autocomplete="cc-number" required /></label>
+           <label>Expiry <input name="exp" autocomplete="cc-exp" placeholder="MM / YY" required /></label>
+           <label>CVC <input name="cvc" autocomplete="cc-csc" required /></label>
+           <label>Name on card <input name="ccname" autocomplete="cc-name" required /></label>
+           <button type="submit">Place order</button>
+         </form>`,
+      );
+    }
+
+    if (url.pathname === '/store/pay' && req.method === 'POST') {
+      const params = new URLSearchParams(await readBody(req));
+      // The fixture's own sandbox: only the published test card is accepted.
+      if ((params.get('cardnumber') ?? '').replace(/\D/g, '') !== '4242424242424242' || !checkoutDetails || cart.length === 0) {
+        return html(402, 'Payment declined', '<h1>Payment declined</h1><p role="alert">Use the sandbox test card.</p>');
+      }
+      const id = `ORD-${1000 + orders.length + 1}`;
+      const total = cart.reduce((sum, line) => sum + (products.find((item) => item.id === line.productId)?.price ?? 0) * line.qty, 0) + 5;
+      orders.push({ id, total, email: checkoutDetails.email ?? '' });
+      cart.length = 0;
+      res.writeHead(302, { location: `/store/orders/${id}` });
+      res.end();
+      return;
+    }
+
+    const orderMatch = url.pathname.match(/^\/store\/orders\/(ORD-\d+)$/);
+    if (orderMatch && req.method === 'GET') {
+      const order = orders.find((item) => item.id === orderMatch[1]);
+      if (!order) {
+        res.writeHead(404, { 'content-type': 'text/plain' });
+        res.end('Not found');
+        return;
+      }
+      return html(
+        200,
+        'Order confirmed',
+        `<h1>Thank you!</h1>
+         <p>Your order number is ${order.id}.</p>
+         <p>Total charged: ${money(order.total)}</p>
+         <a href="/store/account/orders">My orders</a>`,
+      );
+    }
+
+    if (url.pathname === '/store/account/orders' && req.method === 'GET') {
+      // PLANTED BUG B17: the newest order is missing from the order history.
+      const visible = orders.slice(0, -1);
+      return html(
+        200,
+        'My orders',
+        `<h1>My orders</h1>
+         ${visible.length ? `<ul>${visible.map((order) => `<li>${order.id} — ${money(order.total)}</li>`).join('')}</ul>` : '<p>You have no orders yet.</p>'}`,
+      );
+    }
+
     if (url.pathname === '/checkout') {
       return html(
         200,
@@ -282,6 +549,7 @@ export async function startFixture(port = 0): Promise<FixtureServer> {
   }
   return {
     url: `http://127.0.0.1:${address.port}`,
+    mutations,
     close: () =>
       new Promise((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));

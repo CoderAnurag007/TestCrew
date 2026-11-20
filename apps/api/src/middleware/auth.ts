@@ -4,17 +4,24 @@ import { HttpError } from '../lib/http-error.js';
 import { assertAuthenticated, assertMinRole } from '../lib/authorization.js';
 import { SESSION_COOKIE } from '../lib/constants.js';
 import { readSession } from '../lib/session.js';
+import { hashApiToken, TOKEN_PREFIX } from '../lib/api-token.js';
 
 const PUBLIC_PREFIXES = [
   '/auth/login',
   '/auth/register',
   '/auth/logout',
   '/health',
+  '/public',
   '/docs',
   '/documentation',
 ];
 
 export async function authPreHandler(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
+  const authorization = request.headers.authorization;
+  if (authorization?.startsWith(`Bearer ${TOKEN_PREFIX}`)) {
+    await authenticateApiToken(request, authorization.slice('Bearer '.length).trim());
+    return;
+  }
   const sessionId = request.cookies[SESSION_COOKIE];
   if (!sessionId) {
     return;
@@ -45,6 +52,40 @@ export async function authPreHandler(request: FastifyRequest, _reply: FastifyRep
     return;
   }
   request.currentUser = user;
+}
+
+async function authenticateApiToken(request: FastifyRequest, raw: string): Promise<void> {
+  const token = await request.server.prisma.apiToken.findUnique({
+    where: { tokenHash: hashApiToken(raw) },
+    include: { project: { select: { organizationId: true } } },
+  });
+  if (!token || token.revokedAt) {
+    throw new HttpError(401, 'Invalid or revoked API token');
+  }
+  const organization = await request.server.prisma.organization.findUnique({
+    where: { id: token.organizationId },
+    select: { id: true, name: true, slug: true },
+  });
+  if (!organization) {
+    throw new HttpError(401, 'Invalid API token');
+  }
+  request.apiToken = { id: token.id, projectId: token.projectId, organizationId: token.organizationId, name: token.name };
+  request.currentUser = {
+    id: token.createdById,
+    email: `api-token+${token.prefix}@testcrew.local`,
+    name: `API token ${token.name}`,
+    memberships: [{ id: `token-${token.id}`, organizationId: token.organizationId, role: 'MEMBER', organization }],
+  };
+  void request.server.prisma.apiToken
+    .update({ where: { id: token.id }, data: { lastUsedAt: new Date() } })
+    .catch(() => undefined);
+}
+
+/** API tokens are scoped to one project; anything else looks like it does not exist. */
+export function assertTokenScope(request: FastifyRequest, projectId: string, notFound = 'Not found'): void {
+  if (request.apiToken && request.apiToken.projectId !== projectId) {
+    throw new HttpError(404, notFound);
+  }
 }
 
 export function isPublicPath(url: string): boolean {
@@ -93,6 +134,7 @@ export async function requireProjectAccess(
   if (!project) {
     throw new HttpError(404, 'Project not found');
   }
+  assertTokenScope(request, project.id, 'Project not found');
   const membership = user.memberships.find((item) => item.organizationId === project.organizationId);
   assertMinRole(membership?.role, minimum, 'Project not found');
   if (!membership) {

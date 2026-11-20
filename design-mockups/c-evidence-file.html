@@ -1,0 +1,148 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#FAF9F6;--card:#FFFFFF;--ink:#141414;--dim:#6E6B66;--rule:#E4E1DA;--red:#D92D20}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:"Inter Tight",sans-serif;width:1440px}
+.mono{font-family:"IBM Plex Mono",monospace}
+section{position:relative;width:1440px;height:900px;overflow:hidden}
+nav{display:flex;align-items:center;gap:32px;padding:26px 56px;font-size:15px;color:var(--dim)}
+.logo{font-family:"Instrument Serif";font-size:28px;color:var(--ink);margin-right:24px;letter-spacing:-.01em}
+.logo span{color:var(--red)}
+nav .cta{margin-left:auto;color:var(--ink);border-bottom:1.5px solid var(--ink);padding-bottom:2px;font-weight:500}
+.copy{position:absolute;left:56px;top:170px;width:620px}
+.case{font:500 12px "IBM Plex Mono";color:var(--dim);letter-spacing:.06em;display:flex;gap:18px;margin-bottom:28px}
+.case b{color:var(--red);font-weight:500}
+h1{font-family:"Instrument Serif";font-weight:400;font-size:112px;line-height:.92;letter-spacing:-.025em}
+h1 i{color:var(--red)}
+.sub{margin-top:30px;font-size:19px;line-height:1.5;color:#3d3a36;max-width:470px}
+.cta2{display:inline-block;margin-top:34px;background:var(--ink);color:#fff;padding:15px 22px;font-weight:500;font-size:15px}
+.cta2 + span{margin-left:22px;color:var(--dim);font-size:15px}
+/* evidence */
+.shot{position:absolute;background:var(--card);border:1px solid var(--rule);box-shadow:0 1px 0 var(--rule),0 18px 40px -24px rgba(20,20,20,.25)}
+.shot .cap{display:flex;justify-content:space-between;font:500 11px "IBM Plex Mono";color:var(--dim);padding:10px 12px;border-top:1px solid var(--rule)}
+.pg{position:relative;background:#F1EFEA;overflow:hidden}
+.pb{position:absolute;background:#DEDAD2;border-radius:3px}
+.pb.dark{background:#141414}
+.ring{position:absolute;pointer-events:none}
+.slip{position:absolute;background:var(--card);border:1px solid var(--rule);padding:16px 18px;font-size:13.5px;line-height:1.5}
+.slip h4{font:500 11px "IBM Plex Mono";color:var(--dim);letter-spacing:.06em;margin-bottom:8px}
+.slip dl{display:grid;grid-template-columns:96px 1fr;gap:6px 10px}
+.slip dt{color:var(--dim)}
+.slip dd .r{color:var(--red)}
+.stamp{position:absolute;font:500 13px "IBM Plex Mono";color:var(--red);border:2px solid var(--red);padding:6px 10px;letter-spacing:.1em;transform:rotate(-6deg)}
+/* app */
+.app{display:grid;grid-template-columns:340px 1fr}
+.list{border-right:1px solid var(--rule);height:900px;display:flex;flex-direction:column}
+.list .head{padding:26px 24px 18px;border-bottom:1px solid var(--rule)}
+.list .head h2{font-family:"Instrument Serif";font-weight:400;font-size:40px;line-height:1}
+.list .head p{font:500 12px "IBM Plex Mono";color:var(--dim);margin-top:8px}
+.ex{display:grid;grid-template-columns:56px 1fr;gap:10px;padding:16px 24px;border-bottom:1px solid var(--rule)}
+.ex .n{font-family:"Instrument Serif";font-size:30px;line-height:1;color:#B8B4AC}
+.ex b{font-weight:500;font-size:14.5px;display:block}
+.ex p{font:12px "IBM Plex Mono";color:var(--dim);margin-top:4px}
+.ex.on{background:var(--card);box-shadow:inset 3px 0 0 var(--red)}
+.ex.on .n{color:var(--red)}
+.detail{padding:30px 44px;display:grid;grid-template-columns:1fr 330px;gap:30px;align-content:start}
+.detail header{grid-column:1/3;border-bottom:1px solid var(--rule);padding-bottom:20px}
+.detail header .case{margin-bottom:12px}
+.detail h3{font-family:"Instrument Serif";font-weight:400;font-size:52px;line-height:1;letter-spacing:-.02em}
+.facts{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--ink)}
+.facts div{padding:14px 0;border-bottom:1px solid var(--rule)}
+.facts span{font:500 11px "IBM Plex Mono";color:var(--dim);letter-spacing:.06em;display:block;margin-bottom:4px}
+.facts p{font-size:15px;line-height:1.45}
+.facts p.r{color:var(--red)}
+.steps{counter-reset:s;list-style:none;margin-top:4px}
+.steps li{counter-increment:s;font-size:14px;padding:5px 0;display:flex;gap:10px}
+.steps li:before{content:counter(s,decimal-leading-zero);font:500 12px "IBM Plex Mono";color:var(--dim);padding-top:2px}
+.btnrow{display:flex;gap:10px;margin-top:18px}
+.btnrow a{font-size:14px;font-weight:500;padding:10px 14px;border:1px solid var(--ink)}
+.btnrow a.p{background:var(--ink);color:#fff}
+</style></head><body>
+
+<section id="landing">
+  <nav><div class="logo">TestCrew<span>.</span></div><span>How it works</span><span>Sample report</span><span>Pricing</span><span class="cta">Start an audit</span></nav>
+  <div class="copy">
+    <div class="case"><span>CASE 0142</span><span>SHOP.EXAMPLE-STORE.COM</span><b>3 EXHIBITS</b></div>
+    <h1>Exhibit A:<br>the button that <i>does nothing.</i></h1>
+    <p class="sub">TestCrew clicks every control on your site and brings back evidence: the screenshot, the steps, the console error, and what should have happened.</p>
+    <a class="cta2">Open a case on your site</a><span>Free for one site</span>
+  </div>
+
+  <!-- the evidence -->
+  <div class="shot" style="left:760px;top:120px;width:560px;transform:rotate(1.2deg)">
+    <div class="pg" style="height:360px">
+      <div class="pb" style="left:20px;top:18px;width:90px;height:12px"></div>
+      <div class="pb" style="left:20px;top:52px;width:240px;height:240px"></div>
+      <div class="pb" style="left:284px;top:58px;width:220px;height:20px;background:#C9C4BA"></div>
+      <div class="pb" style="left:284px;top:90px;width:90px;height:16px"></div>
+      <div class="pb" style="left:284px;top:130px;width:250px;height:8px"></div><div class="pb" style="left:284px;top:146px;width:210px;height:8px"></div>
+      <div class="pb" style="left:284px;top:184px;width:150px;height:30px;background:#fff;border:1px solid #C9C4BA"></div>
+      <div class="pb dark" style="left:442px;top:184px;width:70px;height:30px"></div>
+      <div class="pb dark" style="left:284px;top:228px;width:228px;height:40px"></div>
+      <svg class="ring" style="left:420px;top:166px" width="116" height="68" viewBox="0 0 116 68" fill="none"><path d="M8 36 C6 14 48 6 78 9 C104 12 112 26 108 42 C103 60 60 64 34 60 C14 57 4 46 12 30 C16 22 26 16 36 13" stroke="#D92D20" stroke-width="3" stroke-linecap="round"/></svg>
+    </div>
+    <div class="cap"><span>EXHIBIT A · /checkout/pay</span><span>06:41:12</span></div>
+  </div>
+  <div class="slip" style="left:690px;top:560px;width:390px;transform:rotate(-1.4deg)">
+    <h4>EVIDENCE · #033</h4>
+    <dl>
+      <dt>We clicked</dt><dd>“Apply” next to the coupon field</dd>
+      <dt>Expected</dt><dd>The total drops by 10%</dd>
+      <dt>Happened</dt><dd class="r"><span class="r">Nothing. Total stayed $128.00</span></dd>
+      <dt>Console</dt><dd class="mono" style="font-size:12px">TypeError: promo is undefined</dd>
+    </dl>
+  </div>
+  <div class="shot" style="left:1110px;top:530px;width:250px;transform:rotate(3deg)">
+    <div class="pg" style="height:140px">
+      <div class="pb" style="left:14px;top:14px;width:100px;height:100px;display:grid;place-items:center;background:#ECE9E3;border:1px dashed #C9C4BA"></div>
+      <div class="pb" style="left:128px;top:20px;width:100px;height:12px"></div><div class="pb" style="left:128px;top:42px;width:70px;height:10px"></div>
+      <svg class="ring" style="left:4px;top:4px" width="122" height="122" fill="none"><circle cx="61" cy="61" r="54" stroke="#D92D20" stroke-width="3" stroke-dasharray="300" stroke-linecap="round"/></svg>
+    </div>
+    <div class="cap"><span>EXHIBIT B · 404 IMAGE</span><span>06:31</span></div>
+  </div>
+  <div class="stamp" style="left:1210px;top:96px">REPRODUCED 3/3</div>
+</section>
+
+<section id="app" class="app">
+  <div class="list">
+    <div class="head"><h2>Case 0142</h2><p>SHOP.EXAMPLE-STORE.COM · 3 EXHIBITS · 1,284 CLICKS</p></div>
+    <div class="ex on"><span class="n">A</span><div><b>Apply coupon does nothing</b><p>HIGH · /checkout/pay</p></div></div>
+    <div class="ex"><span class="n">B</span><div><b>Product image returns 404</b><p>MEDIUM · 6 pages</p></div></div>
+    <div class="ex"><span class="n">C</span><div><b>Email field has no label</b><p>LOW · /signup</p></div></div>
+    <div style="padding:20px 24px;font:12px 'IBM Plex Mono';color:var(--dim)">1,281 OTHER CONTROLS WORKED.<br>SEE THE FULL LOG →</div>
+  </div>
+  <div class="detail">
+    <header>
+      <div class="case"><span>EXHIBIT A · #033</span><b>HIGH</b><span>REPRODUCED 3 OF 3 TIMES</span></div>
+      <h3>“Apply” next to the coupon field does nothing.</h3>
+    </header>
+    <div class="shot" style="position:relative">
+      <div class="pg" style="height:520px">
+        <div class="pb" style="left:28px;top:24px;width:130px;height:16px"></div>
+        <div class="pb" style="left:28px;top:70px;width:340px;height:110px"></div>
+        <div class="pb" style="left:28px;top:196px;width:340px;height:110px"></div>
+        <div class="pb" style="left:396px;top:70px;width:228px;height:300px;background:#E6E2DA"></div>
+        <div class="pb" style="left:414px;top:96px;width:100px;height:14px"></div><div class="pb" style="left:548px;top:96px;width:58px;height:14px"></div>
+        <div class="pb" style="left:414px;top:126px;width:100px;height:14px"></div><div class="pb" style="left:548px;top:126px;width:58px;height:14px;background:#141414"></div>
+        <div class="pb" style="left:414px;top:220px;width:120px;height:34px;background:#fff;border:1px solid #C9C4BA"></div>
+        <div class="pb dark" style="left:542px;top:220px;width:64px;height:34px"></div>
+        <div class="pb dark" style="left:414px;top:300px;width:192px;height:46px"></div>
+        <svg class="ring" style="left:524px;top:204px" width="100" height="66" fill="none"><path d="M8 36 C6 14 44 6 66 9 C88 12 96 24 93 38 C89 54 56 60 32 57 C14 54 4 44 10 30 C13 24 22 18 30 15" stroke="#D92D20" stroke-width="3" stroke-linecap="round"/></svg>
+        <div class="mono" style="position:absolute;left:520px;top:184px;font-size:11px;color:#D92D20">clicked 06:41:12</div>
+      </div>
+      <div class="cap"><span>/checkout/pay · 1440 × 900 · Chrome</span><span>BEFORE · AFTER</span></div>
+    </div>
+    <div>
+      <div class="facts">
+        <div><span>WHAT WE DID</span><ol class="steps"><li>Added Trail Runner, size 42</li><li>Opened checkout as a guest</li><li>Typed SAVE10, clicked Apply</li></ol></div>
+        <div><span>WHAT SHOULD HAPPEN</span><p>The total drops to $115.20, or an error says the code is invalid.</p></div>
+        <div><span>WHAT HAPPENED</span><p class="r">Nothing. No message. Total stayed $128.00.</p></div>
+        <div><span>CONSOLE</span><p class="mono" style="font-size:12.5px">TypeError: promo is undefined<br><span style="color:var(--dim)">at applyPromo (checkout.js:212)</span></p></div>
+      </div>
+      <div class="btnrow"><a class="p">Copy repro steps</a><a>Hide finding</a></div>
+    </div>
+  </div>
+</section>
+</body></html>

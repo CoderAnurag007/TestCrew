@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const membershipRoleSchema = z.enum(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER']);
 export type MembershipRole = z.infer<typeof membershipRoleSchema>;
 
-export const credentialTypeSchema = z.enum(['USERNAME_PASSWORD']);
+export const credentialTypeSchema = z.enum(['USERNAME_PASSWORD', 'STORAGE_STATE']);
 export type CredentialType = z.infer<typeof credentialTypeSchema>;
 
 export const runStatusSchema = z.enum([
@@ -69,6 +69,15 @@ export type TestPriority = z.infer<typeof testPrioritySchema>;
 
 export const evidenceTypeSchema = z.enum(['SCREENSHOT', 'HTML', 'HAR', 'LOG', 'VIDEO', 'JSON']);
 export type EvidenceType = z.infer<typeof evidenceTypeSchema>;
+
+export const safetyModeSchema = z.enum(['READ_ONLY', 'FULL']);
+export type SafetyMode = z.infer<typeof safetyModeSchema>;
+
+export const findingChangeSchema = z.enum(['NEW', 'RECURRING', 'REGRESSED']);
+export type FindingChange = z.infer<typeof findingChangeSchema>;
+
+export const failureClassSchema = z.enum(['APP_BUG', 'TEST_BUG', 'ENVIRONMENT', 'FLAKY']);
+export type FailureClass = z.infer<typeof failureClassSchema>;
 
 export const actionRiskSchema = z.enum(['SAFE', 'CAUTION', 'DESTRUCTIVE']);
 export type ActionRisk = z.infer<typeof actionRiskSchema>;

@@ -7,6 +7,10 @@ export async function originGuard(request: FastifyRequest, _reply: FastifyReply)
   if (SAFE_METHODS.has(request.method)) {
     return;
   }
+  if (request.apiToken) {
+    // Bearer tokens are not sent automatically by browsers, so CSRF does not apply.
+    return;
+  }
 
   const allowed = request.server.env.WEB_ORIGIN;
   const origin = request.headers.origin;

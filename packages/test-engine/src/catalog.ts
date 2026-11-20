@@ -1,7 +1,10 @@
 import type { CandidateAction, DiscoveredElement, SemanticPage, SelectorMeta } from '@auditor/shared';
 
 export function catalogFromSemantic(page: SemanticPage, stateId?: string): DiscoveredElement[] {
-  return page.elements.map((element) => ({
+  // Tests can only use what a visitor can see: hidden elements (a mobile-only search box at
+  // desktop width, items of a closed menu) and visually hidden skip links make tests that
+  // fail for the test's own reasons, not the app's.
+  return page.elements.filter((element) => element.visible !== false && !isSkipLink(element.text ?? element.label, element.href)).map((element) => ({
     id: element.id,
     stateId,
     url: page.url,
@@ -13,6 +16,7 @@ export function catalogFromSemantic(page: SemanticPage, stateId?: string): Disco
     riskLevel: element.riskLevel,
     inputType: element.inputType,
     selectors: element.selectors,
+    ...(element.constraints ? { constraints: element.constraints } : {}),
   }));
 }
 
@@ -141,4 +145,9 @@ export function toCandidate(element: DiscoveredElement): CandidateAction {
     selectors: element.selectors,
     stableKey: `${element.type}:${element.selectors.primary}`,
   };
+}
+
+/** "Skip to content" links jump to an anchor and are hidden until focused. */
+export function isSkipLink(label: string | null | undefined, href: string | null | undefined): boolean {
+  return /^\s*skip (to|navigation)\b/i.test(label ?? '') && (!href || href.trim().startsWith('#'));
 }

@@ -82,11 +82,16 @@ export function FlowGraph({
   );
 
   if (states.length === 0) {
-    return <p className="text-sm text-muted-foreground">No application states discovered yet.</p>;
+    return (
+      <div className="flex h-[320px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#cfd3d9] text-center">
+        <p className="text-sm font-medium text-ink">No application states discovered yet</p>
+        <p className="max-w-sm text-[13px] text-muted-foreground">Screens and the actions between them appear here as the audit explores.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="h-[520px] rounded-md border bg-background">
+    <div className="h-[420px] overflow-hidden rounded-lg border border-border bg-well sm:h-[560px]">
       <ReactFlow
         nodes={nodes}
         edges={flowEdges}
@@ -95,12 +100,12 @@ export function FlowGraph({
         minZoom={0.25}
         nodesConnectable={false}
         elementsSelectable
-        colorMode="dark"
+        colorMode="light"
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{ type: 'smoothstep' }}
       >
-        <Background gap={18} />
-        <Controls />
+        <Background gap={20} color="#d3d6db" />
+        <Controls showInteractive={false} className="!overflow-hidden !rounded-md !border !border-border !shadow-none" />
       </ReactFlow>
     </div>
   );
@@ -110,17 +115,21 @@ function StateNode({ data }: NodeProps) {
   const status = String(data.status ?? 'untested');
   const tone =
     status === 'failed'
-      ? 'border-red-400/60 bg-red-500/10 text-red-50'
+      ? 'border-[#f2c4bf] bg-[#fdf1ef] text-ink'
       : status === 'visited'
-        ? 'border-emerald-400/50 bg-emerald-500/10 text-emerald-50'
-        : 'border-zinc-500/50 bg-zinc-800 text-zinc-100';
+        ? 'border-border bg-card text-ink'
+        : 'border-border bg-well text-muted-foreground';
+  const dot = status === 'failed' ? 'bg-danger' : status === 'visited' ? 'bg-success' : 'bg-[#cfd3d9]';
   return (
-    <div className={`min-w-[200px] max-w-[240px] rounded-lg border px-3 py-2 shadow-sm ${tone}`}>
-      <Handle type="target" position={Position.Left} className="!h-2 !w-2 !bg-zinc-400" />
-      <Handle type="source" position={Position.Right} className="!h-2 !w-2 !bg-zinc-400" />
-      <div className="truncate text-sm font-medium">{String(data.label)}</div>
-      {data.path ? <div className="mt-0.5 truncate font-mono text-[10px] opacity-70">{String(data.path)}</div> : null}
-      {Number(data.loops) > 0 ? <div className="mt-1 text-[10px] opacity-70">↻ {String(data.loops)} self-loop{Number(data.loops) === 1 ? '' : 's'}</div> : null}
+    <div className={`min-w-[200px] max-w-[240px] rounded-md border px-3 py-2 ${tone}`}>
+      <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-[#8a8f97]" />
+      <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-[#8a8f97]" />
+      <div className="flex items-center gap-2">
+        <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${dot}`} />
+        <span className="truncate text-sm font-medium">{String(data.label)}</span>
+      </div>
+      {data.path ? <div className="mono mt-0.5 truncate text-[11px] text-muted-foreground">{String(data.path)}</div> : null}
+      {Number(data.loops) > 0 ? <div className="mt-1 text-[11px] text-muted-foreground">↻ {String(data.loops)} self-loop{Number(data.loops) === 1 ? '' : 's'}</div> : null}
     </div>
   );
 }

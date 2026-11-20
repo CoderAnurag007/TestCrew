@@ -1,0 +1,150 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#F2EFE7;--ink:#121212;--dim:#6B6862;--rule:#D9D4C7;--red:#E0301E;--blue:#1F5BD8;--green:#0E8A4F;--amber:#E8A317;--teal:#0F8C99}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:"Schibsted Grotesk",sans-serif;width:1440px}
+.mono{font-family:"IBM Plex Mono",monospace}
+section{position:relative;width:1440px;height:900px;overflow:hidden}
+nav{display:flex;align-items:center;gap:32px;padding:24px 56px;font-size:15px;border-bottom:2px solid var(--ink)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:900;font-size:20px;letter-spacing:-.02em;margin-right:20px}
+.logo i{width:22px;height:22px;border-radius:50%;border:5px solid var(--ink);background:var(--paper)}
+nav .cta{margin-left:auto;background:var(--ink);color:var(--paper);padding:11px 18px;font-weight:700}
+.copy{position:absolute;left:56px;top:150px;width:520px}
+.kicker{display:inline-flex;gap:8px;align-items:center;font:500 12px "IBM Plex Mono";margin-bottom:26px}
+.kicker i{width:12px;height:12px;border-radius:50%;background:var(--red)}
+h1{font-weight:900;font-size:84px;line-height:.92;letter-spacing:-.045em}
+.sub{margin-top:28px;font-size:19px;line-height:1.45;color:#3c3a36;max-width:440px}
+.btns{display:flex;gap:12px;margin-top:34px}
+.btns a{font-weight:700;padding:14px 20px;border:2px solid var(--ink)}
+.btns a.p{background:var(--ink);color:var(--paper)}
+.map{position:absolute;left:600px;top:96px}
+.legend{position:absolute;left:56px;bottom:40px;display:flex;gap:26px;font-size:14px;font-weight:500}
+.legend span{display:flex;align-items:center;gap:8px}
+.legend i{width:26px;height:6px;border-radius:3px}
+.board{position:absolute;right:56px;bottom:36px;background:var(--ink);color:#F2EFE7;width:360px;padding:16px 18px;font:13px "IBM Plex Mono"}
+.board h4{font:500 11px "IBM Plex Mono";color:#9a968c;letter-spacing:.08em;margin-bottom:10px}
+.board div{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #2b2b2b}
+.board .d{color:#FF7A6B}.board .g{color:#7FD7A4}
+/* app */
+.app{display:grid;grid-template-columns:220px 1fr;grid-template-rows:auto 1fr}
+.app nav{grid-column:1/3}
+.side{border-right:2px solid var(--ink);padding:24px 20px;display:flex;flex-direction:column;gap:4px;font-weight:500}
+.side a{padding:8px 10px}
+.side a.on{background:var(--ink);color:var(--paper)}
+.side h5{font:500 11px "IBM Plex Mono";color:var(--dim);margin:18px 10px 6px;letter-spacing:.06em}
+.content{padding:28px 36px;display:grid;grid-template-columns:1fr 380px;gap:28px;align-content:start}
+.content h2{grid-column:1/3;font-weight:900;font-size:40px;letter-spacing:-.035em;display:flex;align-items:baseline;gap:16px}
+.content h2 small{font:500 13px "IBM Plex Mono";color:var(--dim);letter-spacing:0}
+.mapcard{border:2px solid var(--ink);background:#F7F5EF;height:640px;position:relative}
+.lines{display:flex;flex-direction:column;gap:0;border:2px solid var(--ink)}
+.line{display:grid;grid-template-columns:8px 1fr auto;gap:14px;padding:14px 16px;border-top:1px solid var(--rule);align-items:start}
+.line:first-child{border-top:0}
+.line i{height:100%;min-height:38px;border-radius:4px}
+.line b{display:block;font-size:16px}
+.line p{font-size:13.5px;color:var(--dim);margin-top:2px}
+.line .st{font:500 12px "IBM Plex Mono";white-space:nowrap}
+.st.ok{color:var(--green)} .st.bad{color:var(--red)} .st.run{color:var(--ink)}
+.callout{position:absolute;background:var(--paper);border:2px solid var(--red);padding:10px 12px;font-size:13px;width:250px}
+.callout b{color:var(--red);font:500 11px "IBM Plex Mono";display:block;margin-bottom:4px;letter-spacing:.04em}
+</style></head><body>
+
+<section id="landing">
+  <nav><div class="logo"><i></i>TestCrew</div><span>How it works</span><span>Journeys</span><span>Reports</span><span>Pricing</span><span class="cta">Start an audit</span></nav>
+  <div class="copy">
+    <div class="kicker mono"><i></i>LINE STATUS · 1 DELAY ON CHECKOUT</div>
+    <h1>Every journey your customers take. Walked.</h1>
+    <p class="sub">TestCrew rides every route through your site, from search to checkout, and tells you exactly which stop is broken.</p>
+    <div class="btns"><a class="p">Start an audit</a><a>See a sample report</a></div>
+  </div>
+
+  <svg class="map" width="800" height="700" viewBox="0 0 800 700" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- lines -->
+    <path d="M60 120 H300 L380 200 V420 L460 500 H740" stroke="#E0301E" stroke-width="12"/>
+    <path d="M60 300 H260 L340 220 H560 L640 140 H740" stroke="#1F5BD8" stroke-width="12"/>
+    <path d="M140 620 V420 L220 340 H380 L460 260 V120" stroke="#0E8A4F" stroke-width="12"/>
+    <path d="M60 560 H300 L380 480 V420" stroke="#E8A317" stroke-width="12"/>
+    <path d="M560 220 V600 H740" stroke="#0F8C99" stroke-width="12"/>
+    <!-- interchange stations -->
+    <g fill="#F2EFE7" stroke="#121212" stroke-width="5">
+      <rect x="360" y="196" width="40" height="40" rx="20"/>
+      <rect x="360" y="400" width="40" height="40" rx="20"/>
+      <rect x="540" y="200" width="40" height="40" rx="20"/>
+    </g>
+    <!-- stations -->
+    <g fill="#F2EFE7" stroke-width="5">
+      <circle cx="60" cy="120" r="11" stroke="#E0301E"/><circle cx="200" cy="120" r="11" stroke="#E0301E"/>
+      <circle cx="600" cy="500" r="11" stroke="#E0301E"/>
+      <circle cx="60" cy="300" r="11" stroke="#1F5BD8"/><circle cx="740" cy="140" r="11" stroke="#1F5BD8"/>
+      <circle cx="140" cy="620" r="11" stroke="#0E8A4F"/><circle cx="460" cy="120" r="11" stroke="#0E8A4F"/>
+      <circle cx="60" cy="560" r="11" stroke="#E8A317"/><circle cx="200" cy="560" r="11" stroke="#E8A317"/>
+      <circle cx="740" cy="600" r="11" stroke="#0F8C99"/><circle cx="560" cy="420" r="11" stroke="#0F8C99"/>
+    </g>
+    <!-- broken stop -->
+    <circle cx="740" cy="500" r="17" fill="#E0301E"/>
+    <path d="M732 492 L748 508 M748 492 L732 508" stroke="#fff" stroke-width="4"/>
+    <circle cx="740" cy="500" r="27" stroke="#E0301E" stroke-width="2" stroke-dasharray="4 5"/>
+    <!-- labels -->
+    <g font-family="Schibsted Grotesk" font-weight="700" font-size="15" fill="#121212" stroke="#F2EFE7" stroke-width="6" paint-order="stroke">
+      <text x="44" y="100">Home</text><text x="176" y="100">/shop</text>
+      <text x="404" y="252">/product/:id</text><text x="412" y="446">/cart</text>
+      <text x="590" y="262">/search</text><text x="574" y="532">/checkout/address</text>
+      <text x="664" y="466" fill="#E0301E">/checkout/pay</text>
+      <text x="22" y="330">Sign up</text><text x="690" y="112">/account</text>
+      <text x="158" y="650">Search bar</text><text x="476" y="112">Results</text>
+      <text x="22" y="590">Wishlist</text><text x="574" y="425">Filters</text><text x="640" y="588">Compare</text>
+    </g>
+  </svg>
+
+  <div class="legend">
+    <span><i style="background:var(--red)"></i>Checkout</span><span><i style="background:var(--blue)"></i>Sign up</span>
+    <span><i style="background:var(--green)"></i>Search</span><span><i style="background:var(--amber)"></i>Wishlist</span><span><i style="background:var(--teal)"></i>Browse</span>
+  </div>
+  <div class="board">
+    <h4>LINE STATUS · 06:41</h4>
+    <div><span>Checkout</span><span class="d">Broken at /pay</span></div>
+    <div><span>Sign up</span><span class="g">Good service</span></div>
+    <div><span>Search</span><span class="g">Good service</span></div>
+  </div>
+</section>
+
+<section id="app" class="app">
+  <nav><div class="logo"><i></i>TestCrew</div><span style="color:var(--dim)">Example Store / Runs / #142</span><span class="cta">New audit</span></nav>
+  <div class="side">
+    <a class="on">Run #142</a><a>Findings</a><a>Journeys</a><a>Interactions</a><a>Report</a>
+    <h5>PROJECT</h5><a>Overview</a><a>Settings</a>
+  </div>
+  <div class="content">
+    <h2>Run #142 <small>shop.example-store.com · 06:41 elapsed · 3 bugs</small></h2>
+    <div class="mapcard">
+      <svg width="100%" height="100%" viewBox="0 0 640 620" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M40 90 H240 L300 150 V330 L360 390 H600" stroke="#E0301E" stroke-width="10"/>
+        <path d="M360 390 H600" stroke="#F7F5EF" stroke-width="5" stroke-dasharray="2 12"/>
+        <path d="M40 250 H210 L270 190 H600" stroke="#1F5BD8" stroke-width="10"/>
+        <path d="M110 560 V330 L170 270 H300" stroke="#0E8A4F" stroke-width="10"/>
+        <path d="M110 560 V420" stroke="#F7F5EF" stroke-width="5" stroke-dasharray="2 12"/>
+        <path d="M450 190 V540 H600" stroke="#0F8C99" stroke-width="10"/>
+        <g fill="#F7F5EF" stroke="#121212" stroke-width="4"><circle cx="300" cy="150" r="15"/><circle cx="300" cy="330" r="15"/><circle cx="450" cy="190" r="15"/></g>
+        <g fill="#F7F5EF" stroke-width="4"><circle cx="40" cy="90" r="9" stroke="#E0301E"/><circle cx="150" cy="90" r="9" stroke="#E0301E"/><circle cx="40" cy="250" r="9" stroke="#1F5BD8"/><circle cx="600" cy="190" r="9" stroke="#1F5BD8"/><circle cx="110" cy="560" r="9" stroke="#0E8A4F"/><circle cx="600" cy="540" r="9" stroke="#0F8C99"/><circle cx="450" cy="400" r="9" stroke="#0F8C99"/></g>
+        <circle cx="480" cy="390" r="15" fill="#E0301E"/><path d="M473 383 L487 397 M487 383 L473 397" stroke="#fff" stroke-width="3.5"/>
+        <!-- crew position -->
+        <circle cx="110" cy="420" r="8" fill="#121212"/><circle cx="110" cy="420" r="16" stroke="#121212" stroke-width="2"/>
+        <g font-family="Schibsted Grotesk" font-weight="700" font-size="13" fill="#121212" stroke="#F7F5EF" stroke-width="5" paint-order="stroke">
+          <text x="24" y="72">Home</text><text x="130" y="72">/shop</text><text x="320" y="146">/product/:id</text><text x="320" y="352">/cart</text>
+          <text x="462" y="222">/search</text><text x="500" y="372" fill="#E0301E">/checkout/pay</text><text x="132" y="424">Crew is here</text>
+          <text x="20" y="276">Sign up</text><text x="606" y="216">/account</text>
+        </g>
+      </svg>
+      <div class="callout" style="left:380px;top:430px"><b>BROKEN STOP · #033</b>“Apply coupon” on /checkout/pay does nothing. The total stays $128.00.</div>
+    </div>
+    <div class="lines">
+      <div class="line"><i style="background:var(--red)"></i><div><b>Checkout</b><p>Stopped at /checkout/pay: the coupon field has no effect.</p></div><span class="st bad">BROKEN</span></div>
+      <div class="line"><i style="background:var(--blue)"></i><div><b>Sign up</b><p>5 of 5 stops passed, form validates.</p></div><span class="st ok">GOOD</span></div>
+      <div class="line"><i style="background:var(--green)"></i><div><b>Search</b><p>Walking now, at stop 3 of 5.</p></div><span class="st run">RUNNING</span></div>
+      <div class="line"><i style="background:var(--amber)"></i><div><b>Wishlist</b><p>4 of 4 stops passed.</p></div><span class="st ok">GOOD</span></div>
+      <div class="line"><i style="background:var(--teal)"></i><div><b>Browse</b><p>1 broken image on /compare.</p></div><span class="st bad">1 BUG</span></div>
+    </div>
+  </div>
+</section>
+</body></html>

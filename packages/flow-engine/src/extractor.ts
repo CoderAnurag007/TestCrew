@@ -1,4 +1,4 @@
-import type { CandidateAction, SemanticElement, SemanticPage } from '@auditor/shared';
+import { valueFor, type CandidateAction, type SemanticElement, type SemanticPage } from '@auditor/shared';
 import { classifyActionRisk } from '@auditor/browser';
 
 const NAV = /\b(nav|home|dashboard|users|settings|account|profile|reports|analytics|orders|inbox)\b/i;
@@ -86,11 +86,16 @@ export class ActionExtractor {
     const type = this.actionType(element);
     const category = this.category(element, label);
     const stableKey = `${type}:${element.selectors.primary}:${element.href ?? ''}:${label}`;
+    const input = type === 'fill' ? this.sampleInput(element) : null;
+    if (type === 'fill' && input === null) {
+      // Payment and identity fields are never filled by the explorer.
+      return null;
+    }
     return {
       id: element.id,
       type,
       target: element.selectors.primary,
-      input: type === 'fill' ? this.sampleInput(element) : null,
+      input,
       label,
       category,
       riskLevel,
@@ -134,18 +139,20 @@ export class ActionExtractor {
     return 'click';
   }
 
-  private sampleInput(element: SemanticElement): string {
-    const kind = (element.inputType ?? element.name ?? '').toLowerCase();
-    if (kind.includes('email')) {
-      return 'auditor@example.com';
-    }
-    if (kind.includes('search') || kind.includes('filter') || kind.includes('q')) {
-      return 'alpha';
-    }
-    if (element.placeholder) {
-      return 'sample';
-    }
-    return 'Sample value';
+  private sampleInput(element: SemanticElement): string | null {
+    return valueFor({
+      inputType: element.inputType,
+      name: element.name,
+      label: element.label,
+      placeholder: element.placeholder,
+      tag: element.type,
+      autocomplete: element.constraints?.autocomplete,
+      min: element.constraints?.min,
+      max: element.constraints?.max,
+      minLength: element.constraints?.minLength,
+      maxLength: element.constraints?.maxLength,
+      pattern: element.constraints?.pattern,
+    });
   }
 
   private category(element: SemanticElement, label: string): string {

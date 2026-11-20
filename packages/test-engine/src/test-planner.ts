@@ -5,6 +5,12 @@ export interface PlannedScenario {
   category: TestCategory;
   reason: string;
   elementIds: string[];
+  /**
+   * The chosen elements themselves. Element ids are only unique within one page
+   * ("el_23" exists on every page), so looking them up by id across the whole site
+   * can return another page's element.
+   */
+  elements?: DiscoveredElement[];
   requiresAuth: boolean;
   viewport?: 'desktop' | 'tablet' | 'mobile';
   flowName?: string;
@@ -38,6 +44,7 @@ export class TestPlanner {
         category: 'HAPPY_PATH',
         reason: 'Login form was discovered',
         elementIds: [username.id, password.id, submit.id],
+        elements: [username, password, submit],
         requiresAuth: false,
         flowName: 'Authentication',
       });
@@ -46,6 +53,7 @@ export class TestPlanner {
         category: 'NEGATIVE',
         reason: 'Negative authentication coverage',
         elementIds: [username.id, password.id, submit.id],
+        elements: [username, password, submit],
         requiresAuth: false,
         flowName: 'Authentication',
       });
@@ -89,30 +97,15 @@ export class TestPlanner {
         category: 'NAVIGATION',
         reason: 'Discovered navigation control',
         elementIds: [link.id],
+        elements: [link],
         requiresAuth: true,
         flowName: link.label,
       });
     }
 
-    const forms = input.catalog.filter((item) => item.category === 'crud' || /save|create|submit/i.test(item.label));
-    if (forms.length > 0) {
-      scenarios.push({
-        name: 'Submit discovered form',
-        category: 'HAPPY_PATH',
-        reason: 'CRUD/form controls were discovered',
-        elementIds: forms.map((item) => item.id),
-        requiresAuth: true,
-        flowName: 'CRUD',
-      });
-      scenarios.push({
-        name: 'Submit form without required values',
-        category: 'VALIDATION',
-        reason: 'Forms need empty-input coverage',
-        elementIds: forms.map((item) => item.id),
-        requiresAuth: true,
-        flowName: 'CRUD',
-      });
-    }
+    // Form submission tests are built per form by ConsistencyCheckGenerator, which
+    // knows which fields belong to which form. Mixing controls from every page into
+    // one "form" produced tests that could never run.
 
     const risky = input.catalog.filter((item) => {
       const hay = `${item.label} ${item.href ?? ''}`;
@@ -124,18 +117,40 @@ export class TestPlanner {
         category: 'ERROR_HANDLING',
         reason: 'Potentially failing destination discovered',
         elementIds: [item.id],
+        elements: [item],
         requiresAuth: true,
         flowName: item.label,
       });
     }
 
-    const search = input.catalog.find((item) => item.category === 'search' || item.selectors.testId === 'search');
+    // Only something a visitor can type into: never a disclosure (<summary>), link or button
+    // that happens to be labelled like a search. A real search box (type or role "search…")
+    // wins over a generic text field.
+    const typeable = (item: (typeof input.catalog)[number]) => {
+      const css = (item.selectors.css ?? item.selectors.primary ?? '').trim().toLowerCase();
+      const role = (item.selectors.role ?? '').toLowerCase();
+      if (/^(summary|details|button|a|li|div|span|label|h[1-6]|p)\b/.test(css)) return false;
+      if (['button', 'link', 'menuitem', 'tab', 'option'].includes(role)) return false;
+      return true;
+    };
+    const searchLike = (item: (typeof input.catalog)[number]) =>
+      (item.inputType ?? '').toLowerCase() === 'search' || ['searchbox', 'combobox'].includes((item.selectors.role ?? '').toLowerCase());
+    const search = input.catalog
+      .filter(
+        (item) =>
+          (item.category === 'search' || item.selectors.testId === 'search') &&
+          (item.type === 'input' || item.type === 'textarea' || item.type === 'fill') &&
+          !['submit', 'button', 'checkbox', 'radio'].includes((item.inputType ?? '').toLowerCase()) &&
+          typeable(item),
+      )
+      .sort((a, b) => Number(searchLike(b)) - Number(searchLike(a)))[0];
     if (search) {
       scenarios.push({
         name: 'Search empty results',
         category: 'EMPTY_STATE',
         reason: 'Search control discovered',
         elementIds: [search.id],
+        elements: [search],
         requiresAuth: true,
         flowName: 'Search',
       });

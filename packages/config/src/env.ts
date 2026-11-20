@@ -1,4 +1,18 @@
+import { isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
+
+/** Repository root (packages/config/src -> ../../..). */
+const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+
+/**
+ * The API and the worker run from different folders (apps/api, apps/worker).
+ * A relative ARTIFACT_DIR used to resolve against each process's own folder,
+ * so the worker wrote screenshots where the API never looked. Relative paths
+ * now resolve against the repository root, the same place for every process.
+ */
+export function resolveArtifactDir(value: string): string {
+  return isAbsolute(value) ? value : resolve(REPO_ROOT, value);
+}
 
 export function booleanFromEnv(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined || value === '') {
@@ -59,7 +73,7 @@ export function loadApiEnv(env: NodeJS.ProcessEnv = process.env): ApiEnv {
     COOKIE_SECURE: booleanFromEnv(parsed.COOKIE_SECURE, parsed.NODE_ENV === 'production'),
     COOKIE_DOMAIN: parsed.COOKIE_DOMAIN === '' ? undefined : parsed.COOKIE_DOMAIN,
     SENTRY_DSN: parsed.SENTRY_DSN === '' ? undefined : parsed.SENTRY_DSN,
-    ARTIFACT_DIR: parsed.ARTIFACT_DIR,
+    ARTIFACT_DIR: resolveArtifactDir(parsed.ARTIFACT_DIR),
   };
 }
 
@@ -118,7 +132,7 @@ export function loadWorkerEnv(env: NodeJS.ProcessEnv = process.env): WorkerEnv {
     S3_SECRET_ACCESS_KEY:
       parsed.S3_SECRET_ACCESS_KEY === '' ? undefined : parsed.S3_SECRET_ACCESS_KEY,
     S3_FORCE_PATH_STYLE: booleanFromEnv(parsed.S3_FORCE_PATH_STYLE, true),
-    ARTIFACT_DIR: parsed.ARTIFACT_DIR,
+    ARTIFACT_DIR: resolveArtifactDir(parsed.ARTIFACT_DIR),
   };
 }
 

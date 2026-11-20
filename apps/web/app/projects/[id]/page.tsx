@@ -2,19 +2,21 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
+import { Radar } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
+import { byNewest, timeAgo, refetchWhileRunning } from '@/components/pages/format';
+import { ProjectHeader, StartAuditButton } from '@/components/pages/project-header';
+import { RunsTable } from '@/components/pages/runs-table';
 import { RunStatusDot } from '@/components/status';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
+import { EmptyState, SectionTitle, StatCard, StatStrip } from '@/components/ui/premium';
 import { projectApi, runApi } from '@/lib/queries';
-import { ApiError } from '@/lib/api';
 
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
   const projectId = params.id;
-  const queryClient = useQueryClient();
 
   const project = useQuery({
     queryKey: ['project', projectId],
@@ -24,86 +26,137 @@ export default function ProjectDetailPage() {
   const runs = useQuery({
     queryKey: ['runs', projectId],
     queryFn: () => runApi.list(projectId),
+    refetchInterval: refetchWhileRunning,
   });
 
-  const startAudit = useMutation({
-    mutationFn: () => runApi.create(projectId, { environmentId: project.data?.environments[0]?.id }),
-    onSuccess: async (run) => {
-      await queryClient.invalidateQueries({ queryKey: ['runs', projectId] });
-      toast.success('Audit queued');
-      window.location.href = `/runs/${run.id}`;
-    },
-    onError: (error) => toast.error(error instanceof ApiError ? error.message : 'Could not start audit'),
-  });
-
-  const lastRun = runs.data?.[0];
-  const findings = { open: 0, critical: 0 };
+  const sorted = runs.data ? [...runs.data].sort(byNewest) : undefined;
+  const lastRun = sorted?.[0];
+  const lastScored = sorted?.find((run) => typeof run.qualityScore === 'number');
+  const environments = project.data?.environments ?? [];
+  const score = lastScored?.qualityScore;
+  const scoreTone =
+    typeof score !== 'number'
+      ? 'default'
+      : score >= 85
+        ? 'success'
+        : score >= 60
+          ? 'warning'
+          : 'danger';
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Application</p>
-          <h1 className="text-3xl font-semibold tracking-tight">{project.data?.name ?? 'Project'}</h1>
-          <p className="mono text-sm text-muted-foreground">{project.data?.baseUrl}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href={`/projects/${projectId}/runs`}>Runs</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href={`/projects/${projectId}/settings`}>Settings</Link>
-          </Button>
-          <Button onClick={() => startAudit.mutate()} disabled={startAudit.isPending || !project.data}>
-            Start Audit
-          </Button>
-        </div>
-      </div>
+      <ProjectHeader
+        projectId={projectId}
+        project={project.data}
+        loading={project.isLoading}
+        error={project.isError}
+      />
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardDescription>Environment</CardDescription>
-            <CardTitle>{project.data?.environments[0]?.name ?? '—'}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>Last run</CardDescription>
-            <CardTitle className="text-base">
-              {lastRun ? <RunStatusDot status={lastRun.status} /> : 'No runs'}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>Open findings</CardDescription>
-            <CardTitle className="font-mono text-2xl">{findings.open}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>Critical findings</CardDescription>
-            <CardTitle className="font-mono text-2xl">{findings.critical}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
+      <StatStrip>
+        <StatCard
+          label="Latest run"
+          value={
+            lastRun ? (
+              <RunStatusDot status={lastRun.status} className="text-sm" />
+            ) : (
+              <span className="text-base font-medium text-muted-foreground">No runs yet</span>
+            )
+          }
+          hint={lastRun ? `Started ${timeAgo(lastRun.createdAt)}` : 'Start an audit to see results'}
+        />
+        <StatCard
+          label="Quality score"
+          tone={scoreTone}
+          value={typeof score === 'number' ? Math.round(score) : '–'}
+          hint={
+            lastScored
+              ? `From the run ${timeAgo(lastScored.createdAt)}`
+              : 'After the first completed audit'
+          }
+        />
+        <StatCard
+          label="Latest tests passed"
+          value={
+            lastRun && typeof lastRun.testsGenerated === 'number' && lastRun.testsGenerated > 0
+              ? `${lastRun.testsPassed ?? 0}/${lastRun.testsGenerated}`
+              : '–'
+          }
+          tone={lastRun?.testsFailed ? 'danger' : 'default'}
+          hint={
+            lastRun?.testsFailed
+              ? `${lastRun.testsFailed} failed in the latest run`
+              : 'Passed of generated tests'
+          }
+        />
+        <StatCard
+          label="Total runs"
+          value={runs.isLoading ? '–' : (runs.data?.length ?? 0)}
+          hint="All audits for this project"
+        />
+      </StatStrip>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Recent activity</CardTitle>
-          <CardDescription>Recent audit activity for this application.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {runs.data?.slice(0, 5).map((run) => (
-            <Link key={run.id} href={`/runs/${run.id}`} className="flex items-center justify-between rounded-md border px-3 py-2">
-              <span className="mono text-xs">{run.id}</span>
-              <RunStatusDot status={run.status} />
-            </Link>
-          ))}
-          {!runs.data?.length && <p className="text-sm text-muted-foreground">No audits have been launched.</p>}
-        </CardContent>
-      </Card>
+      <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <section>
+          <SectionTitle
+            title="Recent runs"
+            description="The last five audits of this app."
+            action={
+              runs.data?.length ? (
+                <Button variant="link" size="sm" asChild>
+                  <Link href={`/projects/${projectId}/runs`}>View all runs</Link>
+                </Button>
+              ) : null
+            }
+          />
+          <Card className="overflow-hidden">
+            <RunsTable
+              runs={sorted?.slice(0, 5)}
+              loading={runs.isLoading}
+              error={runs.isError}
+              empty={
+                <EmptyState
+                  icon={Radar}
+                  title="No audits yet"
+                  description="Start an audit and TestCrew will explore the app, write tests, run them and report what it finds."
+                  action={<StartAuditButton projectId={projectId} project={project.data} />}
+                  className="border-0"
+                />
+              }
+            />
+          </Card>
+        </section>
+
+        <section>
+          <SectionTitle title="Environments" />
+          <Card className="divide-y divide-border">
+            {environments.map((environment, index) => (
+              <div key={environment.id} className="px-4 py-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-ink">
+                  <span className="truncate">{environment.name}</span>
+                  {index === 0 ? (
+                    <span className="shrink-0 text-[12px] font-normal text-muted-foreground">
+                      Used for audits
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mono mt-0.5 truncate text-xs text-muted-foreground">
+                  {environment.baseUrl}
+                </div>
+              </div>
+            ))}
+            {!environments.length ? (
+              <p className="px-4 py-5 text-sm text-muted-foreground">
+                {project.isLoading ? 'Loading…' : 'No environments yet.'}
+              </p>
+            ) : null}
+            <div className="px-4 py-2.5">
+              <Button variant="link" size="sm" asChild>
+                <Link href={`/projects/${projectId}/settings`}>Manage in settings</Link>
+              </Button>
+            </div>
+          </Card>
+        </section>
+      </div>
     </AppShell>
   );
 }

@@ -1,9 +1,4 @@
-'use client';
-
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 
 type CtaSectionProps = {
   primaryHref: string;
@@ -12,24 +7,22 @@ type CtaSectionProps = {
 
 export function CtaSection({ primaryHref, primaryLabel }: CtaSectionProps) {
   return (
-    <section className="py-20 sm:py-28">
-      <div className="mx-auto max-w-5xl px-6">
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="flex flex-col items-center gap-6 px-6 py-12 text-center sm:px-12">
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              Ready to audit your next release?
-            </h2>
-            <p className="max-w-md text-muted-foreground">
-              Create a project, queue a run, and get findings with evidence in minutes.
-            </p>
-            <Button asChild size="lg">
-              <Link href={primaryHref}>
-                {primaryLabel}
-                <ArrowRight className="size-4" aria-hidden />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+    <section className="border-b border-[var(--night-line)]">
+      <div className="mx-auto flex max-w-[1280px] flex-col items-start gap-10 px-4 py-20 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-10 lg:py-28">
+        <h2 className="display max-w-[14ch] text-[36px] sm:text-[52px] xl:text-[60px]">
+          Find the bugs before your users do.
+        </h2>
+        <div className="max-w-[36ch]">
+          <p className="text-[15px] leading-relaxed text-[var(--night-dim)]">
+            Add your app’s URL and start an audit tonight. It runs read-only until you say otherwise.
+          </p>
+          <Link
+            href={primaryHref}
+            className="mt-6 inline-flex h-11 items-center rounded-full bg-[var(--lamp)] px-5 text-[15px] font-medium text-black transition-colors hover:bg-white"
+          >
+            {primaryLabel}
+          </Link>
+        </div>
       </div>
     </section>
   );

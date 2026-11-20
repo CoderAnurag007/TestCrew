@@ -38,7 +38,7 @@ export function cookieHeader(response: { headers: Record<string, unknown> }): st
 }
 
 export async function injectJson(
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
   url: string,
   options?: { cookie?: string; payload?: unknown },
 ) {

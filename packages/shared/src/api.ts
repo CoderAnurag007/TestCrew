@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { credentialTypeSchema, membershipRoleSchema } from './enums.js';
+import { credentialTypeSchema, membershipRoleSchema, safetyModeSchema } from './enums.js';
+import { intentListSchema } from './testing.js';
+import { environmentKindSchema, testPlanSchema } from './test-plan.js';
+
+/** Glob-ish path patterns (e.g. "/checkout*", "/api/orders") that the auditor must never send mutating requests to. */
+const blockedPathPatternsSchema = z.array(z.string().min(1).max(200).regex(/^\//, 'Patterns must start with /')).max(50);
 
 const email = z.string().email().max(320);
 const name = z.string().min(1).max(120);
@@ -82,6 +87,14 @@ export const createProjectBodySchema = z.object({
   allowDestructive: z.boolean().optional(),
   allowPrivateTargets: z.boolean().optional(),
   recordVideo: z.boolean().optional(),
+  safetyMode: safetyModeSchema.optional(),
+  resetHookUrl: url.nullable().optional(),
+  intents: intentListSchema.optional(),
+  blockedPathPatterns: blockedPathPatternsSchema.optional(),
+  /** Optional staging copy of the app. Orders, bookings and payments only ever run there. */
+  stagingUrl: url.optional(),
+  stagingSafetyMode: safetyModeSchema.optional(),
+  testPlan: testPlanSchema.optional(),
 });
 export type CreateProjectBody = z.infer<typeof createProjectBodySchema>;
 
@@ -96,6 +109,11 @@ export const updateProjectBodySchema = z.object({
   allowDestructive: z.boolean().optional(),
   allowPrivateTargets: z.boolean().optional(),
   recordVideo: z.boolean().optional(),
+  safetyMode: safetyModeSchema.optional(),
+  resetHookUrl: url.nullable().optional(),
+  intents: intentListSchema.optional(),
+  blockedPathPatterns: blockedPathPatternsSchema.optional(),
+  testPlan: testPlanSchema.optional(),
 });
 export type UpdateProjectBody = z.infer<typeof updateProjectBodySchema>;
 
@@ -110,12 +128,16 @@ export const listProjectsQuerySchema = z.object({
 export const createEnvironmentBodySchema = z.object({
   name: z.string().min(1).max(80),
   baseUrl: url,
+  kind: environmentKindSchema.optional(),
+  safetyMode: safetyModeSchema.nullable().optional(),
 });
 export type CreateEnvironmentBody = z.infer<typeof createEnvironmentBodySchema>;
 
 export const updateEnvironmentBodySchema = z.object({
   name: z.string().min(1).max(80).optional(),
   baseUrl: url.optional(),
+  kind: environmentKindSchema.optional(),
+  safetyMode: safetyModeSchema.nullable().optional(),
 });
 export type UpdateEnvironmentBody = z.infer<typeof updateEnvironmentBodySchema>;
 
@@ -124,12 +146,34 @@ export const environmentParamsSchema = z.object({
   environmentId: idParam,
 });
 
-export const createCredentialBodySchema = z.object({
-  name: z.string().min(1).max(120),
-  type: credentialTypeSchema.default('USERNAME_PASSWORD'),
-  username: z.string().min(1).max(320),
-  secret: z.string().min(1).max(500),
-});
+export const createCredentialBodySchema = z
+  .object({
+    name: z.string().min(1).max(120),
+    type: credentialTypeSchema.default('USERNAME_PASSWORD'),
+    /** For STORAGE_STATE credentials this is a free-form label such as "SSO session". */
+    username: z.string().min(1).max(320),
+    /** A password, or for STORAGE_STATE the JSON from Playwright's `context.storageState()`. */
+    secret: z.string().min(1).max(1_000_000),
+  })
+  .superRefine((body, ctx) => {
+    if (body.type === 'USERNAME_PASSWORD' && body.secret.length > 500) {
+      ctx.addIssue({ code: 'custom', path: ['secret'], message: 'Password must be at most 500 characters' });
+    }
+    if (body.type === 'STORAGE_STATE') {
+      try {
+        const parsed = JSON.parse(body.secret) as { cookies?: unknown; origins?: unknown };
+        if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.cookies)) {
+          throw new Error('missing cookies');
+        }
+      } catch {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['secret'],
+          message: 'Storage state must be the JSON produced by Playwright context.storageState() (with a cookies array)',
+        });
+      }
+    }
+  });
 export type CreateCredentialBody = z.infer<typeof createCredentialBodySchema>;
 
 export const credentialParamsSchema = z.object({
@@ -139,6 +183,13 @@ export const credentialParamsSchema = z.object({
 
 export const createRunBodySchema = z.object({
   environmentId: z.string().min(1).optional(),
+  /** Audit a different URL for this run only, e.g. a pull-request preview deployment. */
+  baseUrl: url.optional(),
+  /** Re-use the recorded AI decisions of an earlier run so the run can be replayed exactly. */
+  replayOfRunId: z.string().min(1).optional(),
+  trigger: z.enum(['manual', 'ci', 'schedule', 'api']).optional(),
+  /** Browser and screen to audit with; defaults to desktop Chrome. */
+  device: z.enum(['desktop', 'phone', 'safari', 'iphone']).optional(),
 });
 export type CreateRunBody = z.infer<typeof createRunBodySchema>;
 
@@ -162,6 +213,33 @@ export const evidenceParamsSchema = z.object({
 
 export const updateFindingBodySchema = z.object({
   status: z.enum(['OPEN', 'CONFIRMED', 'IGNORED', 'RESOLVED', 'ACKNOWLEDGED', 'DISMISSED']),
+  /** When true with DISMISSED or IGNORED, future runs of this project hide findings with the same signature. */
+  remember: z.boolean().optional(),
+  reason: z.string().max(500).optional(),
+});
+
+export const createApiTokenBodySchema = z.object({
+  name: z.string().min(1).max(120),
+});
+export type CreateApiTokenBody = z.infer<typeof createApiTokenBodySchema>;
+
+export const apiTokenSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  name: z.string(),
+  prefix: z.string(),
+  lastUsedAt: z.coerce.date().nullable(),
+  revokedAt: z.coerce.date().nullable(),
+  createdAt: z.coerce.date(),
+});
+
+export const suppressionSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  signature: z.string(),
+  title: z.string(),
+  reason: z.string().nullable(),
+  createdAt: z.coerce.date(),
 });
 export type UpdateFindingBody = z.infer<typeof updateFindingBodySchema>;
 

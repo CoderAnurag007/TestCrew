@@ -11,6 +11,10 @@
     "./ssrf": {
       "types": "./src/ssrf.ts",
       "default": "./src/ssrf.ts"
+    },
+    "./verification": {
+      "types": "./src/verification.ts",
+      "default": "./src/verification.ts"
     }
   },
   "main": "./src/index.ts",

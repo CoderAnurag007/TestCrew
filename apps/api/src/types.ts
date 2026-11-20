@@ -32,5 +32,7 @@ declare module 'fastify' {
 
   interface FastifyRequest {
     currentUser?: CurrentUser;
+    /** Set when the request authenticated with a project API token (CI). Tokens act as MEMBER on one project only. */
+    apiToken?: { id: string; projectId: string; organizationId: string; name: string };
   }
 }

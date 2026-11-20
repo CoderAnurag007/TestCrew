@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { ApiError } from '@/lib/api';
 import { authApi, orgApi } from '@/lib/queries';
 import type { Organization, SessionUser } from '@auditor/shared';
 
@@ -28,8 +29,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const me = useQuery({
     queryKey: ['me'],
     queryFn: authApi.me,
-    retry: false,
+    // Only a 401 means "signed out". Rate limits, restarts and network blips
+    // are retried instead of bouncing the user to the login page.
+    retry: (failureCount, error) => !(error instanceof ApiError && error.status === 401) && failureCount < 4,
+    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 8_000),
   });
+  const signedOut = !me.data && me.error instanceof ApiError && me.error.status === 401;
 
   const orgs = useQuery({
     queryKey: ['organizations'],
@@ -45,18 +50,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const isLanding = pathname === '/';
     const isAuthForm = pathname === '/login' || pathname === '/register';
-    const publicPath = isLanding || isAuthForm;
+    const isSharedReport = pathname.startsWith('/r/');
+    const publicPath = isLanding || isAuthForm || isSharedReport;
     if (me.isLoading) {
       return;
     }
-    if (!me.data && !publicPath) {
+    if (signedOut && !publicPath) {
       router.replace('/login');
     }
     // Keep marketing `/` reachable when signed in; only bounce auth forms.
     if (me.data && isAuthForm) {
       router.replace('/dashboard');
     }
-  }, [me.data, me.isLoading, pathname, router]);
+  }, [me.data, me.isLoading, signedOut, pathname, router]);
 
   const currentOrg = useMemo(() => {
     const list = orgs.data ?? [];

@@ -1,0 +1,40 @@
+# Example: audit each pull request's preview deployment with TestCrew.
+# Copy to .github/workflows/testcrew-audit.yml in the repository you want audited.
+#
+# Repository secrets/variables:
+#   TESTCREW_API_URL    URL of your TestCrew API, e.g. https://auditor.example.com/api
+#   TESTCREW_TOKEN      Project API token (Project settings -> CI tokens)
+#   TESTCREW_PROJECT    Project id in TestCrew
+name: TestCrew audit
+
+on:
+  deployment_status:
+
+jobs:
+  audit:
+    # Run once the preview deployment for the PR is live.
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Download the TestCrew CLI
+        run: curl -fsSL "${{ vars.TESTCREW_CLI_URL }}" -o testcrew.mjs
+      - name: Audit the preview deployment
+        env:
+          TESTCREW_API_URL: ${{ vars.TESTCREW_API_URL }}
+          TESTCREW_TOKEN: ${{ secrets.TESTCREW_TOKEN }}
+        run: >
+          node testcrew.mjs run
+          --project "${{ vars.TESTCREW_PROJECT }}"
+          --base-url "${{ github.event.deployment_status.environment_url }}"
+          --fail-on new-high
+          --export testcrew.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: testcrew-playwright-tests
+          path: testcrew.spec.ts
+          if-no-files-found: ignore

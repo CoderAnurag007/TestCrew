@@ -11,7 +11,12 @@ import {
   runStatusSchema,
   testCategorySchema,
   testPrioritySchema,
+  safetyModeSchema,
+  findingChangeSchema,
+  failureClassSchema,
 } from './enums.js';
+import { intentListSchema } from './testing.js';
+import { environmentKindSchema } from './test-plan.js';
 
 const id = z.string().min(1);
 const dateTime = z.coerce.date();
@@ -30,6 +35,10 @@ export const organizationSchema = z.object({
   id,
   name: z.string().min(1).max(120),
   slug: z.string().min(1).max(80),
+  brandName: z.string().nullable().optional(),
+  brandLogoUrl: z.string().nullable().optional(),
+  brandColor: z.string().nullable().optional(),
+  brandFooter: z.string().nullable().optional(),
   createdAt: dateTime,
   updatedAt: dateTime,
 });
@@ -58,6 +67,22 @@ export const projectSchema = z.object({
   allowDestructive: z.boolean(),
   allowPrivateTargets: z.boolean(),
   recordVideo: z.boolean().optional().default(false),
+  safetyMode: safetyModeSchema.optional().default('READ_ONLY'),
+  verificationToken: z.string().nullable().optional(),
+  verifiedHost: z.string().nullable().optional(),
+  verifiedAt: dateTime.nullable().optional(),
+  resetHookUrl: z.string().nullable().optional(),
+  intents: intentListSchema.optional().default([]),
+  blockedPathPatterns: z.array(z.string()).optional().default([]),
+  testPlan: z.unknown().optional(),
+  verifiedHosts: z.array(z.string()).optional().default([]),
+  monitorCadence: z.string().nullable().optional(),
+  monitorHourUtc: z.number().int().optional(),
+  monitorWeekday: z.number().int().optional(),
+  monitorEnvironmentId: z.string().nullable().optional(),
+  monitorDevices: z.array(z.string()).optional(),
+  nextMonitorAt: dateTime.nullable().optional(),
+  alertSettings: z.unknown().optional(),
   createdAt: dateTime,
   updatedAt: dateTime,
 });
@@ -69,6 +94,9 @@ export const environmentSchema = z.object({
   projectId: id,
   name: z.string().min(1).max(80),
   baseUrl: url,
+  kind: environmentKindSchema.optional().default('PRODUCTION'),
+  /** null = use the project's safety mode. */
+  safetyMode: safetyModeSchema.nullable().optional(),
   createdAt: dateTime,
   updatedAt: dateTime,
 });
@@ -110,6 +138,15 @@ export const runSchema = z.object({
   testsGenerated: z.number().int().nonnegative().optional(),
   testsPassed: z.number().int().nonnegative().optional(),
   testsFailed: z.number().int().nonnegative().optional(),
+  testsFlaky: z.number().int().nonnegative().optional(),
+  baseUrlOverride: z.string().nullable().optional(),
+  effectiveSafetyMode: safetyModeSchema.nullable().optional(),
+  replayOfRunId: z.string().nullable().optional(),
+  previousRunId: z.string().nullable().optional(),
+  trigger: z.string().optional(),
+  device: z.string().optional(),
+  shareToken: z.string().nullable().optional(),
+  sharedAt: dateTime.nullable().optional(),
   startedAt: dateTime.nullable(),
   completedAt: dateTime.nullable(),
   createdAt: dateTime,
@@ -239,6 +276,10 @@ export const testCaseSchema = z.object({
   preconditions: z.unknown().optional(),
   steps: z.unknown().optional(),
   expectedResults: z.unknown().optional(),
+  testKey: z.string().nullable().optional(),
+  source: z.string().optional(),
+  intentId: z.string().nullable().optional(),
+  quarantined: z.boolean().optional(),
   createdAt: dateTime,
   updatedAt: dateTime,
 });
@@ -253,6 +294,7 @@ export const testRunSchema = z.object({
   errorMessage: z.string().nullable(),
   durationMs: z.number().int().nullable().optional(),
   retryCount: z.number().int().nonnegative().optional(),
+  failureClass: failureClassSchema.nullable().optional(),
   screenshotBeforeKey: z.string().nullable().optional(),
   screenshotFailureKey: z.string().nullable().optional(),
   screenshotAfterKey: z.string().nullable().optional(),
@@ -291,6 +333,10 @@ export const findingSchema = z.object({
   url: z.string().nullable().optional(),
   rootCauseHypothesis: z.string().nullable().optional(),
   mergedCount: z.number().int().positive().optional(),
+  change: findingChangeSchema.optional(),
+  suppressed: z.boolean().optional(),
+  ticketProvider: z.string().nullable().optional(),
+  ticketUrl: z.string().nullable().optional(),
   createdAt: dateTime,
   updatedAt: dateTime,
 });

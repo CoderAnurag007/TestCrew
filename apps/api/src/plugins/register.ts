@@ -5,16 +5,42 @@ import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { jsonSchemaTransform } from '@fastify/type-provider-zod';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { SESSION_COOKIE } from '../lib/constants.js';
 import { authPreHandler, isPublicPath, requireAuth } from '../middleware/auth.js';
 import { originGuard } from '../middleware/origin.js';
+import { HttpError } from '../lib/http-error.js';
+
+/**
+ * Rate limiting runs after authentication (preHandler), so the key is a
+ * verified user or API token, never a value the client can make up.
+ */
+function rateLimitIdentity(request: FastifyRequest): { key: string; authenticated: boolean } {
+  if (request.apiToken) {
+    return { key: `token:${request.apiToken.id}`, authenticated: true };
+  }
+  if (request.currentUser) {
+    return { key: `user:${request.currentUser.id}`, authenticated: true };
+  }
+  return { key: `ip:${request.ip}`, authenticated: false };
+}
+
+/** The only endpoints a project API token may call (CI: start a run, poll it, read results). */
+const API_TOKEN_ROUTES: Array<[string, RegExp]> = [
+  ['POST', /^\/projects\/[^/]+\/runs$/],
+  ['GET', /^\/projects\/[^/]+\/runs$/],
+  ['GET', /^\/projects\/[^/]+$/],
+  ['GET', /^\/runs\/[^/]+$/],
+  ['GET', /^\/runs\/[^/]+\/(summary|export\/playwright|screenshot|report\.html|live|live\/frame)$/],
+  ['GET', /^\/runs\/[^/]+\/evidence\/[^/]+$/],
+  ['POST', /^\/runs\/[^/]+\/cancel$/],
+];
 
 export async function registerPlugins(app: FastifyInstance): Promise<void> {
   await app.register(cors, {
     origin: app.env.WEB_ORIGIN,
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   await app.register(helmet, {
@@ -25,7 +51,12 @@ export async function registerPlugins(app: FastifyInstance): Promise<void> {
   await app.register(cookie);
 
   await app.register(rateLimit, {
-    max: 120,
+    // Signed-in users (session cookie or API token) are limited per user, with
+    // room for the dashboard's polling while an audit runs; anonymous traffic
+    // (login attempts, scanners) keeps a tight per-IP budget.
+    max: (request) => (rateLimitIdentity(request).authenticated ? 600 : 120),
+    keyGenerator: (request) => rateLimitIdentity(request).key,
+    hook: 'preHandler',
     timeWindow: '1 minute',
     skipOnError: true,
     ...(app.env.NODE_ENV === 'test' || app.env.REDIS_URL.startsWith('memory:')
@@ -63,6 +94,11 @@ export async function registerPlugins(app: FastifyInstance): Promise<void> {
             in: 'cookie',
             name: SESSION_COOKIE,
           },
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            description: 'Project API token (tc_...) for CI. Acts as MEMBER on one project.',
+          },
         },
       },
     },
@@ -80,6 +116,13 @@ export async function registerPlugins(app: FastifyInstance): Promise<void> {
       return;
     }
     await requireAuth(request);
+    if (request.apiToken) {
+      const path = request.url.split('?')[0] ?? '';
+      const allowed = API_TOKEN_ROUTES.some(([method, pattern]) => method === request.method && pattern.test(path));
+      if (!allowed) {
+        throw new HttpError(403, 'API tokens can only start runs and read run results');
+      }
+    }
   });
 
   app.addHook('onSend', async (request, reply, payload) => {

@@ -63,5 +63,7 @@ describe('queue behavior', () => {
     const app = await getApp();
     const queue = app.runQueue as MemoryRunQueue;
     expect(queue.added.some((job) => job.name === START_AUDIT_JOB)).toBe(true);
+    // Do not leave a queued run in the shared database for a real worker to pick up.
+    await injectJson('POST', `/runs/${created.json().id}/cancel`, { cookie: user.cookie });
   });
 });

@@ -38,8 +38,10 @@ export class AccessibilityAnalyzer {
         }
         const id = attrs.match(/\bid=["']([^"']+)["']/i)?.[1];
         const aria = /\baria-label=/i.test(attrs);
-        const labelled = id ? new RegExp(`<label[^>]+for=["']${id}["']`, 'i').test(html) : false;
-        if (!aria && !labelled && !/\baria-labelledby=/i.test(attrs)) {
+        const labelled = id ? new RegExp(`<label[^>]+for=["']${escapeRegExp(id)}["']`, 'i').test(html) : false;
+        const wrapped = isInsideLabel(html, match.index ?? 0);
+        const titled = /\btitle=["'][^"']+["']/i.test(attrs);
+        if (!aria && !labelled && !wrapped && !titled && !/\baria-labelledby=/i.test(attrs)) {
           const name = attrs.match(/\bname=["']([^"']+)["']/i)?.[1];
           issues.push({
             title: 'Form control missing accessible name',
@@ -68,7 +70,13 @@ export class AccessibilityAnalyzer {
         }
       }
 
+      // A nameless <button> was already reported from the HTML above; the
+      // semantic pass only adds controls the HTML check cannot see (role=button).
+      const htmlButtonFlagged = issues.some((issue) => issue.url === page.url && issue.title === 'Button missing accessible name');
       for (const element of page.semantic?.elements ?? []) {
+        if (htmlButtonFlagged && element.type === 'button') {
+          continue;
+        }
         if ((element.role === 'button' || element.type === 'button') && !element.selectors.accessibleName && !element.text && !element.label) {
           issues.push({
             title: 'Interactive control missing accessible name',
@@ -83,6 +91,18 @@ export class AccessibilityAnalyzer {
     }
     return uniqueIssues(issues);
   }
+}
+
+/** True when the tag at `index` sits between an opening <label> and its </label>. */
+function isInsideLabel(html: string, index: number): boolean {
+  const before = html.slice(0, index).toLowerCase();
+  const open = before.lastIndexOf('<label');
+  const close = before.lastIndexOf('</label');
+  return open !== -1 && open > close;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function strip(value: string): string {

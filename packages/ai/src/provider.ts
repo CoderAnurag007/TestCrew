@@ -1,8 +1,11 @@
 import type { z } from 'zod';
 import { estimateCostUsd } from './cost.js';
 import type { AiCompletion, AiCompletionRequest, ImageAnalysisRequest } from './types.js';
+import { fetchWithRetry } from './retry.js';
 
 export interface StructuredGenerationRequest {
+  timeoutMs?: number;
+  retries?: number;
   messages: AiCompletionRequest['messages'];
   model?: string;
   temperature?: number;
@@ -85,7 +88,7 @@ export class OpenAiProvider implements AIProvider {
   async analyzeImage(request: ImageAnalysisRequest): Promise<AiCompletion> {
     const model = request.model ?? this.options.visionModel ?? this.options.model;
     const started = Date.now();
-    const response = await fetch(`${this.options.baseUrl ?? 'https://api.openai.com/v1'}/chat/completions`, {
+    const response = await fetchWithRetry(`${this.options.baseUrl ?? 'https://api.openai.com/v1'}/chat/completions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.options.apiKey}`,
@@ -136,7 +139,7 @@ export class OpenAiProvider implements AIProvider {
   private async chat(request: AiCompletionRequest, json: boolean): Promise<AiCompletion> {
     const model = request.model ?? this.options.model;
     const started = Date.now();
-    const response = await fetch(`${this.options.baseUrl ?? 'https://api.openai.com/v1'}/chat/completions`, {
+    const response = await fetchWithRetry(`${this.options.baseUrl ?? 'https://api.openai.com/v1'}/chat/completions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.options.apiKey}`,
@@ -149,7 +152,7 @@ export class OpenAiProvider implements AIProvider {
         ...(json ? { response_format: { type: 'json_object' } } : {}),
         messages: request.messages,
       }),
-    });
+    }, { timeoutMs: request.timeoutMs, retries: request.retries });
 
     if (!response.ok) {
       const body = await response.text();

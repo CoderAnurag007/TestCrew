@@ -16,6 +16,7 @@ import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import { type AuditDependencies } from './engine.js';
 import { processQueuedAuditsFromDatabase } from './memory-queue.js';
+import { sendRunAlerts, startMonitorLoop } from './monitor.js';
 import { handleAuditJob, handleExplorationJob } from './processors/jobs.js';
 
 config({ path: resolve(import.meta.dirname, '../../../.env') });
@@ -55,8 +56,15 @@ const deps: AuditDependencies = {
 };
 
 if (env.REDIS_URL.startsWith('memory:')) {
+  // Scheduled audits only need a QUEUED row here: the loop below picks it up.
+  startMonitorLoop(deps, null);
   await processQueuedAuditsFromDatabase(deps, logger);
 }
+
+const auditQueue = new Queue(AUDIT_QUEUE_NAME, {
+  connection: new Redis(env.REDIS_URL, { maxRetriesPerRequest: null }),
+});
+const stopMonitor = startMonitorLoop(deps, auditQueue);
 
 const connection = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
 const explorationConnection = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
@@ -96,6 +104,7 @@ auditWorker.on('failed', (job, error) => {
         where: { id: job.data.runId, status: { notIn: ['CANCELLED', 'COMPLETED'] } },
         data: { status: 'FAILED', errorMessage: error.message, completedAt: new Date() },
       })
+      .then(() => sendRunAlerts(deps, job.data.runId))
       .catch(() => undefined);
   }
 });
@@ -115,8 +124,10 @@ async function shutdown(): Promise<void> {
   }
   shuttingDown = true;
   logger.info('graceful shutdown');
+  stopMonitor();
   await Promise.all([auditWorker.close(), explorationWorker.close()]);
   await explorationQueue.close();
+  await auditQueue.close();
   connection.disconnect();
   explorationConnection.disconnect();
   await prisma.$disconnect();

@@ -5,13 +5,15 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Radar } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { AuthLayout, FormError } from '@/components/pages/auth-layout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { authApi } from '@/lib/queries';
 import { ApiError } from '@/lib/api';
+
+const MIN_PASSWORD = 10;
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -19,6 +21,7 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: authApi.register,
@@ -26,60 +29,86 @@ export default function RegisterPage() {
       await queryClient.invalidateQueries({ queryKey: ['me'] });
       router.replace('/dashboard');
     },
-    onError: (error) => {
-      toast.error(error instanceof ApiError ? error.message : 'Unable to register');
+    onError: (err) => {
+      const message = err instanceof ApiError ? err.message : 'Unable to register';
+      setError(message);
+      toast.error(message);
     },
   });
 
+  const shortPassword = password.length > 0 && password.length < MIN_PASSWORD;
+
   return (
-    <div className="command-grid flex min-h-screen items-center justify-center p-6">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <div className="mb-3 flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Radar className="size-5" />
-          </div>
-          <CardTitle className="text-xl">Create your auditor account</CardTitle>
-          <CardDescription>Registration creates a user only. You will create a workspace next.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              mutation.mutate({ name, email, password });
-            }}
+    <AuthLayout
+      title="Create your account"
+      description="Set up an account, then create a workspace and your first project."
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link className="font-medium text-cobalt underline-offset-4 hover:underline" href="/login">
+            Sign in
+          </Link>
+        </>
+      }
+    >
+      <form
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setError(null);
+          mutation.mutate({ name, email, password });
+        }}
+      >
+        <FormError message={error} />
+        <div className="space-y-1.5">
+          <Label htmlFor="name">Name</Label>
+          <Input
+            id="name"
+            autoComplete="name"
+            placeholder="Ada Lovelace"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="email">Work email</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            minLength={MIN_PASSWORD}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            aria-invalid={shortPassword ? true : undefined}
+            aria-describedby="password-help"
+            required
+          />
+          <p
+            id="password-help"
+            className={shortPassword ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}
           >
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                minLength={10}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button className="w-full" type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Creating account…' : 'Create account'}
-            </Button>
-          </form>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Already registered?{' '}
-            <Link className="text-primary underline-offset-4 hover:underline" href="/login">
-              Sign in
-            </Link>
+            At least {MIN_PASSWORD} characters
+            {shortPassword ? ` (${MIN_PASSWORD - password.length} more)` : ''}.
           </p>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+        <Button className="w-full" size="lg" type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? <Loader2 className="animate-spin" /> : null}
+          {mutation.isPending ? 'Creating account…' : 'Create account'}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

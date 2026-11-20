@@ -32,7 +32,7 @@ export class NetworkMonitor {
       });
     });
     page.on('response', (response: Response) => {
-      if (response.status() >= 400) {
+      if (response.status() >= 400 && !response.headers()['x-testcrew-blocked']) {
         this.failures.push({
           url: response.url(),
           method: response.request().method(),

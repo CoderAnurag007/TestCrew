@@ -198,3 +198,38 @@ describe('assertions', () => {
     expect(engine.evaluate({ kind: 'page_error', operator: 'absent' }, context).passed).toBe(false);
   });
 });
+
+describe('search test generation across pages', () => {
+  // Element ids such as "el_23" repeat on every page; the generated test must use the
+  // search box the planner chose, not another page's element with the same id.
+  const searchBox: DiscoveredElement = {
+    ...username,
+    id: 'el_23',
+    url: 'https://tools.test/pdf',
+    label: 'Search tools',
+    category: 'search',
+    inputType: 'search',
+    selectors: { ...username.selectors, testId: null, id: 'header-search', role: 'combobox', accessibleName: 'Search tools', label: 'Search tools', name: null, css: '#header-search', primary: '#header-search' },
+  };
+  const faqQuestion: DiscoveredElement = {
+    ...username,
+    id: 'el_23',
+    url: 'https://tools.test/pdf/duplicate-pages',
+    label: 'Can I duplicate the whole document? search',
+    category: 'search',
+    inputType: null,
+    selectors: { ...username.selectors, testId: null, role: null, accessibleName: 'Can I duplicate the whole document?', label: 'Can I duplicate the whole document?', name: null, css: 'summary', primary: 'label=Can I duplicate the whole document?' },
+  };
+
+  it('types into the real search box, never a FAQ <summary> with the same id', () => {
+    const catalog = [searchBox, faqQuestion];
+    const scenarios = new TestPlanner().plan({ catalog, flows: [] });
+    const tests = new ScenarioGenerator().generate({ scenarios, catalog, baseUrl: 'https://tools.test/' });
+    const search = tests.find((test) => test.name === 'Search empty results');
+    expect(search).toBeDefined();
+    const typeStep = search!.steps.find((step) => step.type === 'type');
+    expect(typeStep?.selectors?.primary).toBe('#header-search');
+    // The search box is not reused as its own "submit" button.
+    expect(search!.steps.filter((step) => step.selectors?.primary === '#header-search')).toHaveLength(1);
+  });
+});

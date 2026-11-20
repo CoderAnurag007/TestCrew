@@ -1,5 +1,6 @@
 import type { AuditJobData } from '@auditor/shared';
 import { executeAuditRun, type AuditDependencies, type AuditLogger } from './engine.js';
+import { sendRunAlerts } from './monitor.js';
 
 const POLL_MS = 1_000;
 
@@ -49,6 +50,7 @@ export async function processQueuedAuditsFromDatabase(
         })
         .catch(() => undefined);
     }
+    await sendRunAlerts(deps, run.id);
   }
 }
 

@@ -18,9 +18,11 @@ export interface VisualIssue {
 export class VisualAnalyzer {
   analyze(
     pages: SemanticPage[],
-    options: { viewport?: keyof typeof VIEWPORT_PROFILES } = {},
+    options: { viewport?: keyof typeof VIEWPORT_PROFILES; width?: number } = {},
   ): VisualIssue[] {
-    const viewport = VIEWPORT_PROFILES[options.viewport ?? 'desktop'];
+    const profile = VIEWPORT_PROFILES[options.viewport ?? 'desktop'];
+    // The real screen width of the run's device wins over the profile's nominal one.
+    const viewport = { ...profile, width: options.width ?? profile.width };
     const issues: VisualIssue[] = [];
     for (const page of pages) {
       const boxes = page.elements

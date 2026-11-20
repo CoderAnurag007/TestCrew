@@ -6,6 +6,7 @@ export interface AssertionContext {
   text: string;
   elementExists: boolean;
   elementVisible: boolean;
+  elementText?: string | null;
   attribute?: string | null;
   value?: string | null;
   count: number;
@@ -39,6 +40,34 @@ export class AssertionEngine {
         return compare('attribute', context.attribute ?? '', expected, operator);
       case 'value':
         return compare('value', context.value ?? '', expected, operator);
+      case 'element_text': {
+        if (!context.elementExists) {
+          return {
+            kind: 'element_text',
+            passed: false,
+            expected,
+            actual: '(element not found)',
+            message: `Expected element text ${operator} ${String(expected ?? '')}, but the element was not found`,
+          };
+        }
+        const actualText = (context.elementText ?? '').replace(/\s+/g, ' ').trim();
+        if (operator === 'gte' || operator === 'lte' || (operator === 'equals' && isNumeric(expected) && isNumeric(actualText))) {
+          const actualNumber = toNumber(actualText);
+          const expectedNumber = toNumber(String(expected ?? ''));
+          const passed =
+            actualNumber !== null && expectedNumber !== null && numericCompare(actualNumber, expectedNumber, operator);
+          return {
+            kind: 'element_text',
+            passed,
+            expected,
+            actual: actualText,
+            message: passed
+              ? 'Element text matched'
+              : `Expected element number ${operator} ${String(expected ?? '')}, received "${actualText}"`,
+          };
+        }
+        return compare('element_text', actualText, expected, operator);
+      }
       case 'count': {
         const actual = context.count;
         const passed = numericCompare(actual, Number(expected ?? 1), operator);
@@ -111,7 +140,11 @@ function compare(
   } else if (operator === 'contains') {
     passed = actual.includes(target);
   } else if (operator === 'matches') {
-    passed = new RegExp(target).test(actual);
+    try {
+      passed = new RegExp(target).test(actual);
+    } catch {
+      passed = false;
+    }
   } else if (operator === 'exists') {
     passed = actual.length > 0;
   } else if (operator === 'absent') {
@@ -122,8 +155,53 @@ function compare(
     passed,
     expected,
     actual,
-    message: passed ? `${kind} assertion passed` : `Expected ${kind} ${operator} ${target}, received ${actual}`,
+    // "actual" can be a whole page of text; the message shows an excerpt.
+    message: passed ? `${kind} assertion passed` : `Expected ${kind} ${operator} ${target}, received ${excerpt(actual, target)}`,
   };
+}
+
+/** Up to ~240 characters of `text`, centred on `target` when it appears. */
+function excerpt(text: string, target: string): string {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (clean.length <= 240) return clean;
+  const at = target ? clean.toLowerCase().indexOf(target.toLowerCase()) : -1;
+  const start = at > 80 ? at - 80 : 0;
+  return `${start > 0 ? '…' : ''}${clean.slice(start, start + 240)}…`;
+}
+
+function toNumber(value: string): number | null {
+  const cleaned = value.replace(/[^0-9.-]/g, '');
+  if (!cleaned || cleaned === '-' || cleaned === '.') {
+    return null;
+  }
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isNumeric(value: unknown): boolean {
+  return toNumber(String(value ?? '')) !== null && /^[^a-zA-Z]*$/.test(String(value ?? ''));
+}
+
+/**
+ * Expands {{name}}, {{name+1}} and {{name-2}} using values captured earlier in
+ * the same test. Unknown names are left untouched so the failure is visible.
+ */
+export function expandTemplate(value: string, vars: Record<string, string>): string {
+  return value.replace(/\{\{\s*([a-zA-Z_]\w*)\s*(?:([+-])\s*(\d+(?:\.\d+)?))?\s*\}\}/g, (whole, name: string, sign?: string, amount?: string) => {
+    if (name === 'credential' || !(name in vars)) {
+      return whole;
+    }
+    const raw = vars[name] ?? '';
+    if (!sign || !amount) {
+      return raw;
+    }
+    const base = toNumber(raw);
+    if (base === null) {
+      return whole;
+    }
+    const result = sign === '+' ? base + Number(amount) : base - Number(amount);
+    return String(Number(result.toFixed(6)));
+  });
 }
 
 function numericCompare(actual: number, expected: number, operator: NonNullable<AssertionSpec['operator']>): boolean {

@@ -22,6 +22,22 @@ export const selectorMetaSchema = z.object({
 });
 export type SelectorMeta = z.infer<typeof selectorMetaSchema>;
 
+export const fieldConstraintsSchema = z.object({
+  required: z.boolean().nullable().optional(),
+  min: z.string().nullable().optional(),
+  max: z.string().nullable().optional(),
+  minLength: z.number().int().nullable().optional(),
+  maxLength: z.number().int().nullable().optional(),
+  pattern: z.string().nullable().optional(),
+  autocomplete: z.string().nullable().optional(),
+  formId: z.string().nullable().optional(),
+  formMethod: z.string().nullable().optional(),
+  /** Path the form submits to, e.g. /users for a search form that shows results on /users. */
+  formAction: z.string().nullable().optional(),
+  value: z.string().nullable().optional(),
+});
+export type FieldConstraints = z.infer<typeof fieldConstraintsSchema>;
+
 export const semanticElementSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
@@ -40,6 +56,7 @@ export const semanticElementSchema = z.object({
   hasPopup: z.boolean().nullable().optional(),
   inNavigation: z.boolean().optional(),
   riskLevel: actionRiskSchema,
+  constraints: fieldConstraintsSchema.optional(),
 });
 export type SemanticElement = z.infer<typeof semanticElementSchema>;
 
@@ -51,6 +68,10 @@ export const semanticPageSchema = z.object({
   importantText: z.array(z.string()),
   contentSignature: z.string().optional(),
   elements: z.array(semanticElementSchema),
+  /** Images on the page that failed to load (naturalWidth 0 after load). */
+  brokenImages: z.array(z.string()).optional(),
+  /** Short visible texts from list/table rows, used for search consistency checks. */
+  listItems: z.array(z.string()).optional(),
 });
 export type SemanticPage = z.infer<typeof semanticPageSchema>;
 

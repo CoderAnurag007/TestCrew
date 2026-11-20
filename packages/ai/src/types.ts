@@ -4,6 +4,10 @@ export interface AiMessage {
 }
 
 export interface AiCompletionRequest {
+  /** Give up after this long per attempt (default 60 s). */
+  timeoutMs?: number;
+  /** Extra attempts after rate limits or 5xx answers (default 2). */
+  retries?: number;
   messages: AiMessage[];
   model?: string;
   temperature?: number;

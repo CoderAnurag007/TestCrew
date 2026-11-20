@@ -1,47 +1,51 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { isLiveRunStatus, type FindingStatus, type RunStatus } from '@auditor/shared';
+import { isLiveRunStatus, type FindingSeverity, type FindingStatus } from '@auditor/shared';
+import {
+  Bug,
+  CircleAlert,
+  FlaskConical,
+  ImageIcon,
+  LayoutDashboard,
+  MonitorPlay,
+  MousePointerClick,
+  Route,
+  ScrollText,
+  Workflow,
+} from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
-import { FlowGraph } from '@/components/run/flow-graph';
 import { AuthCredentialsForm, RetryLoginButton, canRetryLoginFailure, needsLoginCredentials } from '@/components/run/auth-credentials-form';
-import { RunStatusDot, SeverityDot } from '@/components/status';
+import { EventLog } from '@/components/run/event-log';
+import { FindingsPanel, TopFindings } from '@/components/run/findings-list';
+import { FlowGraph } from '@/components/run/flow-graph';
+import { InteractionsView } from '@/components/run/interactions-view';
+import { JourneysView } from '@/components/run/journeys-view';
+import { LiveView } from '@/components/run/live-view';
+import { PageEvidence } from '@/components/run/page-evidence';
+import {
+  CoverageCostCard,
+  HealthScoreCard,
+  IntentResultsCard,
+  RecommendationsCard,
+  ReportHero,
+  SafetySummaryCard,
+  SinceLastRunCard,
+  TestsSummaryCard,
+} from '@/components/run/report-sections';
+import { RunContextStrip } from '@/components/run/run-context-strip';
+import { RunHeader } from '@/components/run/run-header';
+import { asRecord, countOf, formatBytes, formatDuration, SEVERITY_ORDER } from '@/components/run/run-utils';
+import { TestsList } from '@/components/run/tests-list';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState, Skeleton } from '@/components/ui/premium';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { runApi, type RunDetail } from '@/lib/queries';
 import { ApiError } from '@/lib/api';
-import { cn } from '@/lib/utils';
-
-const PIPELINE: RunStatus[] = [
-  'QUEUED',
-  'INITIALIZING',
-  'AUTHENTICATING',
-  'DISCOVERING',
-  'EXPLORING',
-  'FINALIZING',
-  'GENERATING_TESTS',
-  'EXECUTING_TESTS',
-  'ANALYZING',
-  'COMPLETED',
-];
-
-function progressPercent(status: RunStatus, pages: number, states: number, actions: number): number {
-  const index = PIPELINE.indexOf(status);
-  if (status === 'COMPLETED') {
-    return 100;
-  }
-  if (status === 'FAILED' || status === 'CANCELLED') {
-    return Math.min(95, Math.max(5, Math.max(index, 0) * 10));
-  }
-  const base = Math.max(index, 0) * 10;
-  const discovered = Math.min(15, pages + states / 2 + actions / 4);
-  return Math.min(95, Math.round(base + discovered));
-}
+import { runApi } from '@/lib/queries';
 
 export default function RunDetailPage() {
   const params = useParams<{ id: string }>();
@@ -51,609 +55,325 @@ export default function RunDetailPage() {
     queryKey: ['run', runId],
     queryFn: () => runApi.get(runId),
     staleTime: 0,
-    refetchIntervalInBackground: true,
+    // The full run payload is heavy; the live frame view polls its own small
+    // endpoint, so refreshing the whole run every 2 s (and not at all in a
+    // hidden tab) is plenty.
+    refetchIntervalInBackground: false,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status && isLiveRunStatus(status) ? 1000 : false;
+      return status && isLiveRunStatus(status) ? 2000 : false;
     },
   });
 
-  const [tab, setTab] = useState('live');
-  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
-  const [selectedFinding, setSelectedFinding] = useState<string | null>(null);
-  const activityEndRef = useRef<HTMLDivElement | null>(null);
-  const screenshotKey = run.data?.lastScreenshotKey ?? null;
-  const lastImageId = [...(run.data?.evidence ?? [])].reverse().find(isImageEvidence)?.id ?? null;
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    let cancelled = false;
-    const load = async () => {
-      let blob = screenshotKey ? await runApi.screenshot(runId) : null;
-      if (!blob && lastImageId) {
-        blob = await runApi.evidence(runId, lastImageId);
-      }
-      if (cancelled || !blob) {
-        return;
-      }
-      objectUrl = URL.createObjectURL(blob);
-      setScreenshotUrl(objectUrl);
-    };
-    void load();
-    return () => {
-      cancelled = true;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [runId, screenshotKey, lastImageId]);
-
-  useEffect(() => {
-    activityEndRef.current?.scrollIntoView({ block: 'end' });
-  }, [run.data?.events?.length, run.data?.currentAction, run.data?.status]);
-
-  const live = Boolean(run.data?.status && isLiveRunStatus(run.data.status));
-
-  const cancel = useMutation({
-    mutationFn: () => runApi.cancel(runId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['run', runId] });
-      toast.success('Run cancelled');
-    },
-    onError: (error) => toast.error(error instanceof ApiError ? error.message : 'Could not cancel run'),
-  });
+  const data = run.data;
+  const live = Boolean(data?.status && isLiveRunStatus(data.status));
+  // Until the user picks a tab, follow the run: Live while it runs, Overview once it is done.
+  const [chosen, setChosen] = useState<{ runId: string; tab: string } | null>(null);
+  const chosenTab = chosen?.runId === runId ? chosen.tab : null;
+  const setChosenTab = (next: string) => setChosen({ runId, tab: next });
+  const tab = chosenTab ?? (!data || live ? 'live' : 'overview');
 
   const updateFinding = useMutation({
-    mutationFn: ({ findingId, status }: { findingId: string; status: FindingStatus }) =>
-      runApi.updateFinding(runId, findingId, status),
-    onSuccess: async () => {
+    mutationFn: ({
+      findingId,
+      status,
+      remember,
+      reason,
+    }: {
+      findingId: string;
+      status: FindingStatus;
+      remember?: boolean;
+      reason?: string;
+    }) => runApi.updateFinding(runId, findingId, status, remember ? { remember, reason } : undefined),
+    onSuccess: async (_data, variables) => {
       await queryClient.invalidateQueries({ queryKey: ['run', runId] });
-      toast.success('Finding updated');
+      toast.success(variables.remember ? 'Marked as not a bug. Hidden in future runs.' : 'Finding updated');
     },
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : 'Could not update finding'),
   });
 
-  const currentIndex = PIPELINE.indexOf(run.data?.status ?? 'QUEUED');
-  const percent = useMemo(
-    () =>
-      progressPercent(
-        run.data?.status ?? 'QUEUED',
-        run.data?.pagesDiscovered ?? 0,
-        run.data?.statesDiscovered ?? 0,
-        run.data?.actionsExecuted ?? 0,
-      ),
-    [run.data],
-  );
+  const allFindings = useMemo(() => data?.findings ?? [], [data?.findings]);
+  const openFindings = allFindings.filter((item) => !item.suppressed);
+  const payload = asRecord(data?.reportPayload ?? data?.report?.payload);
 
-  const finding = run.data?.findings.find((item) => item.id === selectedFinding) ?? run.data?.findings[0];
-  const payload = asRecord(run.data?.reportPayload ?? run.data?.report?.payload);
+  const severityCounts = useMemo(() => {
+    const counts: Record<FindingSeverity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+    const fromPayload = Object.keys(asRecord(payload.counts)).length > 0;
+    if (fromPayload) {
+      for (const severity of SEVERITY_ORDER) counts[severity] = countOf(payload, severity);
+    } else {
+      for (const item of allFindings) if (!item.suppressed) counts[item.severity] += 1;
+    }
+    return counts;
+  }, [payload, allFindings]);
+
+  const scoreValue = payload.overallScore ?? data?.qualityScore ?? data?.report?.qualityScore ?? null;
+  const score = typeof scoreValue === 'number' ? scoreValue : scoreValue != null && !Number.isNaN(Number(scoreValue)) ? Number(scoreValue) : null;
+  const summaryValue = payload.executiveSummary ?? data?.report?.summary ?? null;
+  const summary = typeof summaryValue === 'string' && summaryValue.trim() ? summaryValue : null;
+
+  const showAuthForm = Boolean(data && needsLoginCredentials(data));
+  const showRetryLogin = Boolean(data && !showAuthForm && canRetryLoginFailure(data));
+  const showError = Boolean(
+    data?.errorMessage && (data.status === 'FAILED' || data.status === 'CANCELLED') && !showAuthForm && !showRetryLogin,
+  );
 
   return (
     <AppShell>
-      <div className="mb-6 flex items-end justify-between">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Run</p>
-          <h1 className="mono text-2xl">{run.data?.id ?? runId}</h1>
-          <p className="text-sm text-muted-foreground">
-            {run.data?.project.name} · {run.data?.environment?.name ?? 'No environment'}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {run.data?.projectId ? (
-            <Button variant="outline" asChild>
-              <Link href={`/projects/${run.data.projectId}`}>Back to project</Link>
+      <RunHeader runId={runId} run={data} />
+
+      {run.isError && !data ? (
+        <EmptyState
+          icon={CircleAlert}
+          title="This run could not be loaded"
+          description={run.error instanceof ApiError ? run.error.message : 'Check your connection and try again.'}
+          action={
+            <Button variant="outline" onClick={() => void run.refetch()}>
+              Try again
             </Button>
-          ) : null}
-          {run.data && !['COMPLETED', 'FAILED', 'CANCELLED'].includes(run.data.status) ? (
-            <Button variant="destructive" onClick={() => cancel.mutate()} disabled={cancel.isPending}>
-              Stop
-            </Button>
-          ) : null}
+          }
+        />
+      ) : null}
+
+      {data && showAuthForm ? (
+        <AuthCredentialsForm runId={runId} projectId={data.projectId} loginUrl={data.currentUrl} />
+      ) : null}
+      {showRetryLogin ? <RetryLoginButton runId={runId} /> : null}
+      {showError ? (
+        <div
+          role="alert"
+          className="mb-6 flex items-start gap-3 rounded-lg border border-[#f2c4bf] bg-[#fdf1ef] px-4 py-3 text-sm text-ink"
+        >
+          <CircleAlert className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden />
+          <div className="min-w-0">
+            <p className="font-medium text-danger">{data?.status === 'CANCELLED' ? 'Run cancelled' : 'Run stopped with an error'}</p>
+            <p className="mt-0.5 break-words text-ink">{data?.errorMessage}</p>
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex h-auto flex-wrap">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="live">Live Run</TabsTrigger>
-          <TabsTrigger value="flows">Flows</TabsTrigger>
-          <TabsTrigger value="tests">Tests</TabsTrigger>
-          <TabsTrigger value="findings">Findings</TabsTrigger>
-          <TabsTrigger value="evidence">Evidence</TabsTrigger>
-          <TabsTrigger value="report">Report</TabsTrigger>
-        </TabsList>
+      {data || !run.isError ? (
+        <Tabs value={tab} onValueChange={setChosenTab}>
+          <TabsList className="w-full justify-start sm:w-auto">
+            <TabsTrigger value="live">
+              {live ? <span className="live-dot" aria-hidden /> : <MonitorPlay />}
+              Live
+            </TabsTrigger>
+            <TabsTrigger value="overview">
+              <LayoutDashboard />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="findings">
+              <Bug />
+              Findings
+              <TabCount value={openFindings.length} />
+            </TabsTrigger>
+            <TabsTrigger value="tests">
+              <FlaskConical />
+              Tests
+              <TabCount value={data?.testCases?.length ?? 0} />
+            </TabsTrigger>
+            <TabsTrigger value="journeys">
+              <Route />
+              Journeys
+              <TabCount value={Array.isArray(payload.journeys) ? payload.journeys.length : 0} />
+            </TabsTrigger>
+            <TabsTrigger value="interactions">
+              <MousePointerClick />
+              Interactions
+            </TabsTrigger>
+            <TabsTrigger value="flows">
+              <Workflow />
+              Flows
+            </TabsTrigger>
+            <TabsTrigger value="evidence">
+              <ImageIcon />
+              Evidence
+            </TabsTrigger>
+            <TabsTrigger value="log">
+              <ScrollText />
+              Log
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="overview">
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quality score</CardTitle>
-                <CardDescription>
-                  <RunStatusDot status={run.data?.status ?? 'QUEUED'} />
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-semibold">{run.data?.qualityScore ?? run.data?.report?.qualityScore ?? '—'}</div>
-                <p className="mt-2 text-sm text-muted-foreground">Deterministic score from findings, coverage, and test results.</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Coverage</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1 text-sm">
-                <Row label="Discovered flows" value={run.data?.coverage?.discoveredFlows ?? run.data?.flows?.length ?? 0} />
-                <Row label="Tested" value={run.data?.coverage?.testedFlows ?? 0} />
-                <Row label="Successful" value={run.data?.coverage?.successfulFlows ?? 0} />
-                <Row label="Failed" value={run.data?.coverage?.failedFlows ?? 0} />
-                <Row label="Untested" value={run.data?.coverage?.untestedFlows ?? 0} />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Cost</CardTitle>
-                <CardDescription>Provider secrets are never shown.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-1 text-sm">
-                <Row label="AI cost" value={`$${(run.data?.cost?.aiCostUsd ?? 0).toFixed(4)}`} />
-                <Row
-                  label="Browser duration"
-                  value={`${Math.round((run.data?.cost?.browserDurationMs ?? run.data?.elapsedMs ?? 0) / 1000)}s`}
+          <TabsContent value="live">
+            {data ? <LiveView key={runId} runId={runId} run={data} /> : <LiveSkeleton />}
+          </TabsContent>
+
+          <TabsContent value="overview" className="space-y-6">
+            {data ? (
+              <>
+                <RunContextStrip payload={payload} />
+                <ReportHero
+                  score={score}
+                  summary={summary}
+                  severityCounts={severityCounts}
+                  payload={payload}
+                  status={data.status}
+                  actions={
+                    // The report buttons already sit in the page header; one action here.
+                    <Button variant="outline" onClick={() => setChosenTab('findings')}>
+                      View findings
+                    </Button>
+                  }
                 />
-                <Row
-                  label="Storage estimate"
-                  value={formatBytes(run.data?.cost?.storageBytesEstimate ?? 0)}
-                />
-              </CardContent>
-            </Card>
-          </div>
-          <Card className="mt-4">
-            <CardHeader>
-              <CardTitle>Findings snapshot</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {(run.data?.findings ?? []).slice(0, 5).map((item) => (
-                <div key={item.id} className="flex items-center justify-between rounded-md border px-3 py-2">
-                  <span className="text-sm">{item.title}</span>
-                  <SeverityDot severity={item.severity} />
+                <div className="grid items-start gap-6 lg:grid-cols-2">
+                  <TopFindings findings={allFindings} onOpen={() => setChosenTab('findings')} />
+                  <SinceLastRunCard payload={payload} previousRunId={data.previousRunId} />
+                  <HealthScoreCard payload={payload} />
+                  <SafetySummaryCard payload={payload} effectiveMode={data.effectiveSafetyMode} />
+                  <TestsSummaryCard payload={payload} />
+                  <IntentResultsCard payload={payload} />
+                  <RecommendationsCard payload={payload} />
+                  <CoverageCostCard
+                    coverage={{
+                      discoveredFlows: data.coverage?.discoveredFlows ?? data.flows?.length ?? 0,
+                      testedFlows: data.coverage?.testedFlows ?? 0,
+                      successfulFlows: data.coverage?.successfulFlows ?? 0,
+                      failedFlows: data.coverage?.failedFlows ?? 0,
+                      untestedFlows: data.coverage?.untestedFlows ?? 0,
+                    }}
+                    cost={{
+                      aiCostUsd: data.cost?.aiCostUsd ?? 0,
+                      browserDurationLabel: formatDuration(data.cost?.browserDurationMs ?? data.elapsedMs ?? 0),
+                      storageLabel: formatBytes(data.cost?.storageBytesEstimate ?? 0),
+                    }}
+                  />
                 </div>
-              ))}
-              {!run.data?.findings.length && <p className="text-sm text-muted-foreground">No findings yet.</p>}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="live">
-          {run.data && needsLoginCredentials(run.data) ? (
-            <AuthCredentialsForm runId={runId} projectId={run.data.projectId} loginUrl={run.data.currentUrl} />
-          ) : run.data && canRetryLoginFailure(run.data) ? (
-            <RetryLoginButton runId={runId} />
-          ) : null}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Live progress</CardTitle>
-              <CardDescription>
-                <RunStatusDot status={run.data?.status ?? 'QUEUED'} />
-                {live ? <span className="ml-2 text-primary">Streaming worker activity</span> : null}
-                {run.data?.errorMessage ? <span className="ml-2 text-destructive">{run.data.errorMessage}</span> : null}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
-                <div className="h-full bg-primary transition-all" style={{ width: `${percent}%` }} />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {PIPELINE.map((stage, index) => (
-                  <div
-                    key={stage}
-                    className={cn(
-                      'rounded-full border px-3 py-1 text-[11px] uppercase tracking-wide',
-                      index <= currentIndex ? 'border-primary/40 bg-primary/10 text-primary' : 'text-muted-foreground',
-                    )}
-                  >
-                    {stage.replaceAll('_', ' ')}
-                  </div>
-                ))}
-              </div>
-              <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                <div>
-                  <dt className="text-muted-foreground">Current page</dt>
-                  <dd className="mono truncate">{run.data?.currentUrl ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Current action</dt>
-                  <dd>{run.data?.currentAction ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Pages / states</dt>
-                  <dd>
-                    {run.data?.pagesDiscovered ?? 0} / {run.data?.statesDiscovered ?? 0}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Actions / elapsed</dt>
-                  <dd>
-                    {run.data?.actionsExecuted ?? 0} · {Math.round((run.data?.elapsedMs ?? 0) / 1000)}s
-                  </dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Live screenshot</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {screenshotUrl ? (
-                  <img src={screenshotUrl} alt="Current page" className="w-full rounded-md border" />
-                ) : (
-                  <p className="text-sm text-muted-foreground">Waiting for the first captured screenshot.</p>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Live log</CardTitle>
-                <CardDescription>
-                  {run.data?.currentAction ? `Now: ${run.data.currentAction}` : live ? 'Waiting for the next action' : 'Run is not active'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="max-h-80 space-y-2 overflow-auto font-mono text-xs">
-                {run.data?.status === 'QUEUED' && !run.data.events?.length ? (
-                  <p className="font-sans text-sm text-muted-foreground">Queued. The worker is picking up this audit…</p>
-                ) : null}
-                {run.data?.events?.map((event) => (
-                  <div key={event.id} className="rounded-md border px-3 py-2 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="uppercase tracking-wide text-[11px] text-muted-foreground">
-                        {eventKindLabel(event.kind)}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">
-                        {new Date(event.createdAt).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    <p className="font-sans">{event.message}</p>
-                    {event.url ? <p className="mt-1 truncate text-[11px] text-muted-foreground">{event.url}</p> : null}
-                  </div>
-                ))}
-                {live && run.data?.currentAction ? (
-                  <div className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm">
-                    <span className="uppercase tracking-wide text-[11px] text-primary">now</span>
-                    <p className="font-sans">{run.data.currentAction}</p>
-                    {run.data.currentUrl ? (
-                      <p className="mt-1 truncate text-[11px] text-muted-foreground">{run.data.currentUrl}</p>
-                    ) : null}
-                  </div>
-                ) : null}
-                {!run.data?.events?.length && run.data?.status !== 'QUEUED' ? (
-                  <p className="font-sans text-sm text-muted-foreground">Waiting for worker events.</p>
-                ) : null}
-                <div ref={activityEndRef} />
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="flows">
-          <Card>
-            <CardHeader>
-              <CardTitle>Application graph</CardTitle>
-              <CardDescription>Green is visited, gray is untested. Self-loops are counted on the node instead of overlapping arrows.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FlowGraph
-                states={run.data?.states ?? []}
-                edges={run.data?.edges ?? []}
-                failedUrls={run.data?.findings.map((item) => item.url ?? '').filter(Boolean)}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="tests">
-          <Card>
-            <CardHeader>
-              <CardTitle>Generated tests</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {(run.data?.testCases ?? []).map((test) => {
-                const execution = run.data?.testRuns?.find((item) => item.testCaseId === test.id);
-                return (
-                  <div key={test.id} className="rounded-md border px-3 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <div className="text-sm font-medium">{test.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {test.category} · {test.priority}
-                        </div>
-                      </div>
-                      <span className="text-xs uppercase text-muted-foreground">{execution?.status ?? 'PENDING'}</span>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{test.description}</p>
-                  </div>
-                );
-              })}
-              {!run.data?.testCases?.length && <p className="text-sm text-muted-foreground">Tests appear after exploration.</p>}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="findings">
-          <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle>Findings</CardTitle>
-              </CardHeader>
-              <CardContent className="max-h-[640px] space-y-2 overflow-auto">
-                {(run.data?.findings ?? []).map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={cn(
-                      'w-full rounded-md border px-3 py-2 text-left',
-                      finding?.id === item.id ? 'border-primary bg-primary/5' : '',
-                    )}
-                    onClick={() => setSelectedFinding(item.id)}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium">{item.title}</span>
-                      <SeverityDot severity={item.severity} />
-                    </div>
-                    <p className="text-[11px] uppercase text-muted-foreground">
-                      {item.category} · {Math.round((item.confidence ?? 0.5) * 100)}%
-                    </p>
-                  </button>
-                ))}
-                {!run.data?.findings.length && <p className="text-sm text-muted-foreground">No findings captured.</p>}
-              </CardContent>
-            </Card>
-            {finding ? <FindingDetail runId={runId} finding={finding} onStatus={(status) => updateFinding.mutate({ findingId: finding.id, status })} /> : (
-              <Card>
-                <CardContent className="p-5 text-sm text-muted-foreground">Select a finding to inspect evidence.</CardContent>
-              </Card>
+              </>
+            ) : (
+              <Skeleton className="h-64 w-full rounded-lg" />
             )}
-          </div>
-        </TabsContent>
+          </TabsContent>
 
-        <TabsContent value="evidence">
-          <Card>
-            <CardHeader>
-              <CardTitle>Stored evidence</CardTitle>
-              <CardDescription>Screenshots render inline. Other artifacts stay downloadable.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {(() => {
-                const items = run.data?.evidence ?? [];
-                const images = items.filter(isImageEvidence);
-                const files = items.filter((item) => !isImageEvidence(item));
-                return (
-                  <>
-                    {images.length > 0 ? (
-                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        {images.slice(0, 80).map((item) => (
-                          <figure key={item.id} className="overflow-hidden rounded-md border">
-                            <EvidenceImage runId={runId} evidenceId={item.id} alt={item.fileName ?? 'Screenshot'} />
-                            <figcaption className="truncate px-3 py-2 text-xs text-muted-foreground">
-                              {item.fileName ?? item.type}
-                            </figcaption>
-                          </figure>
-                        ))}
-                      </div>
-                    ) : null}
-                    {files.length > 0 ? (
-                      <div className="space-y-2">
-                        {files.slice(0, 80).map((item) => (
-                          <div key={item.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                            <span>
-                              {item.type} · {item.fileName ?? item.id}
-                            </span>
-                            <EvidenceLink runId={runId} evidenceId={item.id} contentType={item.contentType} />
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                    {!items.length && <p className="text-sm text-muted-foreground">No evidence stored yet.</p>}
-                  </>
-                );
-              })()}
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <TabsContent value="findings">
+            {data ? (
+              <FindingsPanel
+                runId={runId}
+                findings={allFindings}
+                pending={updateFinding.isPending}
+                onStatus={(findingId, status) => updateFinding.mutate({ findingId, status })}
+                onNotABug={(findingId, reason) =>
+                  updateFinding.mutate({ findingId, status: 'DISMISSED', remember: true, reason })
+                }
+              />
+            ) : (
+              <Skeleton className="h-64 w-full rounded-lg" />
+            )}
+          </TabsContent>
 
-        <TabsContent value="report">
-          <Card>
-            <CardHeader>
-              <CardTitle>Audit report</CardTitle>
-              <CardDescription>Numbers come from the database. AI may only summarize them.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              <p>{String(payload.executiveSummary ?? run.data?.report?.summary ?? 'Report will appear after analysis.')}</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Row label="Score" value={String(payload.overallScore ?? run.data?.qualityScore ?? '—')} />
-                <Row label="Critical" value={countOf(payload, 'CRITICAL')} />
-                <Row label="High" value={countOf(payload, 'HIGH')} />
-                <Row label="Medium" value={countOf(payload, 'MEDIUM')} />
-              </div>
-              <div>
-                <h3 className="mb-2 font-medium">Recommendations</h3>
-                <ul className="list-disc space-y-1 pl-5">
-                  {(Array.isArray(payload.recommendations) ? payload.recommendations : []).map((item) => (
-                    <li key={String(item)}>{String(item)}</li>
-                  ))}
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="tests">
+            {data ? (
+              <TestsList testCases={data.testCases ?? []} testRuns={data.testRuns ?? []} live={live} />
+            ) : (
+              <Skeleton className="h-64 w-full rounded-lg" />
+            )}
+          </TabsContent>
+
+          <TabsContent value="journeys" className="space-y-6">
+            {data ? (
+              <>
+                <RunContextStrip payload={payload} />
+                <JourneysView runId={runId} payload={payload} />
+              </>
+            ) : (
+              <Skeleton className="h-64 w-full rounded-lg" />
+            )}
+          </TabsContent>
+
+          <TabsContent value="interactions">
+            {data ? <InteractionsView payload={payload} /> : <Skeleton className="h-64 w-full rounded-lg" />}
+          </TabsContent>
+
+          <TabsContent value="flows">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle>Application graph</CardTitle>
+                    <CardDescription>
+                      Every screen the audit reached and the actions between them. Self-loops are counted on the node.
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-wrap gap-4 text-[13px] text-muted-foreground" aria-label="Legend">
+                    <Legend dot="bg-success" label="Visited" />
+                    <Legend dot="bg-danger" label="Has findings" />
+                    <Legend dot="bg-[#cfd3d9]" label="Untested" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <FlowGraph
+                  states={data?.states ?? []}
+                  edges={data?.edges ?? []}
+                  failedUrls={allFindings.map((item) => item.url ?? '').filter(Boolean)}
+                />
+                {data?.flows?.length ? (
+                  <div>
+                    <h3 className="mb-2 text-[13px] font-medium text-muted-foreground">
+                      Discovered flows ({data.flows.length})
+                    </h3>
+                    <ul className="divide-y divide-border rounded-lg border border-border">
+                      {data.flows.map((flow) => (
+                        <li key={flow.id} className="px-4 py-2.5">
+                          <p className="text-sm font-medium text-ink">{flow.name}</p>
+                          {flow.description ? (
+                            <p className="mt-0.5 line-clamp-2 text-[13px] text-muted-foreground">{flow.description}</p>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="evidence">
+            {data ? (
+              <PageEvidence runId={runId} run={data} payload={payload} />
+            ) : (
+              <Skeleton className="h-64 w-full rounded-lg" />
+            )}
+          </TabsContent>
+
+          <TabsContent value="log">
+            <EventLog events={data?.events ?? []} />
+          </TabsContent>
+        </Tabs>
+      ) : null}
     </AppShell>
   );
 }
 
-function Row({ label, value }: { label: string; value: string | number }) {
+function TabCount({ value }: { value: number }) {
+  if (!value) {
+    return null;
+  }
   return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="mono">{value}</span>
+    <span className="tabular rounded-[4px] bg-well px-1.5 py-px text-[12px] font-medium text-muted-foreground">
+      {value}
+    </span>
+  );
+}
+
+function Legend({ dot, label }: { dot: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span aria-hidden className={`size-2 rounded-full ${dot}`} />
+      {label}
+    </span>
+  );
+}
+
+function LiveSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="Loading run">
+      <Skeleton className="h-28 w-full rounded-lg" />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <Skeleton className="aspect-[16/10] w-full rounded-lg" />
+        <Skeleton className="h-80 w-full rounded-lg" />
+      </div>
     </div>
   );
-}
-
-function FindingDetail({
-  runId,
-  finding,
-  onStatus,
-}: {
-  runId: string;
-  finding: NonNullable<RunDetail['findings']>[number];
-  onStatus: (status: FindingStatus) => void;
-}) {
-  const screenshots = (finding.evidence ?? []).filter((item) => item.type === 'SCREENSHOT' || item.contentType.startsWith('image/'));
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{finding.title}</CardTitle>
-        <CardDescription>
-          <SeverityDot severity={finding.severity} /> · {Math.round((finding.confidence ?? 0.5) * 100)}% confidence · {finding.status}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4 text-sm">
-        <p>{finding.description}</p>
-        <section>
-          <h3 className="font-medium">Steps to reproduce</h3>
-          <ol className="mt-1 list-decimal space-y-1 pl-5">
-            {asSteps(finding.steps).map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ol>
-        </section>
-        <section>
-          <h3 className="font-medium">Expected</h3>
-          <p className="text-muted-foreground">{finding.expected ?? '—'}</p>
-        </section>
-        <section>
-          <h3 className="font-medium">Actual</h3>
-          <p className="text-muted-foreground">{finding.actual ?? '—'}</p>
-        </section>
-        <section>
-          <h3 className="font-medium">Recommendation</h3>
-          <p className="text-muted-foreground">{finding.recommendation ?? '—'}</p>
-        </section>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {screenshots.map((item) => (
-            <EvidenceImage key={item.id} runId={runId} evidenceId={item.id} />
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {(['OPEN', 'CONFIRMED', 'IGNORED', 'RESOLVED'] as FindingStatus[]).map((status) => (
-            <Button key={status} size="sm" variant={finding.status === status ? 'default' : 'outline'} onClick={() => onStatus(status)}>
-              {status}
-            </Button>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function EvidenceImage({ runId, evidenceId, alt = 'Evidence screenshot' }: { runId: string; evidenceId: string; alt?: string }) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    let cancelled = false;
-    void runApi.evidence(runId, evidenceId).then((blob) => {
-      if (cancelled || !blob) {
-        return;
-      }
-      objectUrl = URL.createObjectURL(blob);
-      setUrl(objectUrl);
-    });
-    return () => {
-      cancelled = true;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [runId, evidenceId]);
-  if (!url) {
-    return <div className="h-40 rounded-md bg-muted" />;
-  }
-  return <img src={url} alt={alt} className="w-full bg-background object-contain" />;
-}
-
-function EvidenceLink({ runId, evidenceId, contentType }: { runId: string; evidenceId: string; contentType: string }) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    void runApi.evidence(runId, evidenceId).then((blob) => {
-      if (!blob) {
-        return;
-      }
-      objectUrl = URL.createObjectURL(blob);
-      setUrl(objectUrl);
-    });
-    return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [runId, evidenceId]);
-  if (!url) {
-    return <span className="text-xs text-muted-foreground">{contentType}</span>;
-  }
-  return (
-    <a href={url} target="_blank" rel="noreferrer" className="text-xs underline">
-      Open
-    </a>
-  );
-}
-
-function eventKindLabel(kind: string): string {
-  const labels: Record<string, string> = {
-    action: 'Did',
-    page: 'Opened',
-    stage: 'Stage',
-    test: 'Test',
-    info: 'Note',
-    error: 'Error',
-  };
-  return labels[kind] ?? kind;
-}
-
-function isImageEvidence(item: { type: string; contentType: string; fileName?: string | null }): boolean {
-  return (
-    item.type === 'SCREENSHOT' ||
-    item.contentType.startsWith('image/') ||
-    /\.(png|jpe?g|gif|webp)$/i.test(item.fileName ?? '')
-  );
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-}
-
-function countOf(payload: Record<string, unknown>, key: string): string {
-  const counts = asRecord(payload.counts);
-  return String(counts[key] ?? 0);
-}
-
-function asSteps(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return value ? [String(value)] : ['No recorded steps'];
-  }
-  return value.map((item) => {
-    if (item && typeof item === 'object' && 'description' in item) {
-      return String((item as { description: string }).description);
-    }
-    return String(item);
-  });
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

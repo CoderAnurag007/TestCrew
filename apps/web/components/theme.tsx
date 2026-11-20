@@ -1,57 +1,17 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { THEME_STORAGE_KEY, themeFromValue } from '@/lib/theme-script';
+import { createContext, useContext } from 'react';
 
-export type Theme = 'light' | 'dark';
+/**
+ * The app is designed for light mode only. This provider stays so existing
+ * imports keep working; it always reports "light".
+ */
+export type Theme = 'light';
 
-const ThemeContext = createContext<{
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
-}>({
-  theme: 'dark',
-  setTheme: () => undefined,
-});
-
-function persistTheme(theme: Theme) {
-  try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-  } catch {
-    /* private mode */
-  }
-  document.cookie = `${THEME_STORAGE_KEY}=${theme}; path=/; max-age=31536000; samesite=lax`;
-}
-
-function readStoredTheme(): Theme {
-  try {
-    return themeFromValue(window.localStorage.getItem(THEME_STORAGE_KEY));
-  } catch {
-    return 'dark';
-  }
-}
-
-function applyTheme(theme: Theme) {
-  document.documentElement.classList.toggle('dark', theme === 'dark');
-  document.documentElement.style.colorScheme = theme;
-}
+const value = { theme: 'light' as Theme, setTheme: (_theme: Theme) => undefined };
+const ThemeContext = createContext(value);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('dark');
-
-  useEffect(() => {
-    const next = readStoredTheme();
-    setThemeState(next);
-    persistTheme(next);
-    applyTheme(next);
-  }, []);
-
-  const setTheme = useCallback((next: Theme) => {
-    setThemeState(next);
-    persistTheme(next);
-    applyTheme(next);
-  }, []);
-
-  const value = useMemo(() => ({ theme, setTheme }), [theme, setTheme]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 

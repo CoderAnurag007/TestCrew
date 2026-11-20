@@ -26,6 +26,8 @@ export class PageObserver {
   private readonly dom = new DOMExtractor();
   private readonly accessibility = new AccessibilityExtractor();
   private attached = false;
+  private consoleOffset = 0;
+  private networkOffset = 0;
 
   attach(page: Page): void {
     if (this.attached) {
@@ -43,8 +45,14 @@ export class PageObserver {
       const dom = await this.dom.extract(page);
       const accessibilityTree = await this.accessibility.extract(page);
       const screenshot = await this.screenshots.capture(page);
-      const consoleMessages = this.consoleMonitor.snapshot();
-      const network = this.networkMonitor.snapshot();
+      // Only what happened since the previous observation belongs to this screen;
+      // otherwise one page's errors would be blamed on every page after it.
+      const allConsole = this.consoleMonitor.snapshot();
+      const allNetwork = this.networkMonitor.snapshot();
+      const consoleMessages = allConsole.slice(this.consoleOffset);
+      const network = { failures: allNetwork.failures.slice(this.networkOffset), navigations: allNetwork.navigations };
+      this.consoleOffset = allConsole.length;
+      this.networkOffset = allNetwork.failures.length;
       return {
         semantic,
         dom,
@@ -53,7 +61,7 @@ export class PageObserver {
         console: consoleMessages,
         networkFailures: network.failures,
         navigations: network.navigations,
-        pageErrors: consoleMessages.filter((item) => item.type === 'error'),
+        pageErrors: consoleMessages.filter((item) => item.type === 'pageerror'),
       };
     });
   }

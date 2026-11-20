@@ -13,12 +13,14 @@ import { HttpError } from './lib/http-error.js';
 import { MemoryRunQueue, MemorySessionStore, type RunQueuePort, type SessionStore } from './lib/runtime.js';
 import { registerAuthRoutes } from './modules/auth/routes.js';
 import { registerCredentialRoutes } from './modules/credentials/routes.js';
+import { registerLaunchRoutes } from './modules/launch/routes.js';
 import { registerDashboardRoutes } from './modules/dashboard/routes.js';
 import { registerEnvironmentRoutes } from './modules/environments/routes.js';
 import { registerHealthRoutes } from './modules/health/routes.js';
 import { registerOrganizationRoutes } from './modules/organizations/routes.js';
 import { registerProjectRoutes } from './modules/projects/routes.js';
 import { registerRunRoutes } from './modules/runs/routes.js';
+import { registerTokenRoutes } from './modules/tokens/routes.js';
 import { registerPlugins } from './plugins/register.js';
 import './types.js';
 
@@ -115,7 +117,9 @@ export async function buildApp(env: ApiEnv = loadApiEnv()) {
   await registerEnvironmentRoutes(app);
   await registerCredentialRoutes(app);
   await registerRunRoutes(app);
+  await registerTokenRoutes(app);
   await registerDashboardRoutes(app);
+  await registerLaunchRoutes(app);
 
   app.addHook('onClose', async () => {
     await runQueue.close();

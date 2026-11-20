@@ -2,16 +2,25 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide',
+  'inline-flex h-5 items-center gap-1 whitespace-nowrap rounded-[4px] border px-1.5 text-[12px] font-medium leading-none',
   {
     variants: {
       variant: {
-        default: 'border-transparent bg-primary/15 text-primary',
-        muted: 'border-transparent bg-muted text-muted-foreground',
-        outline: 'text-foreground',
-        critical: 'border-transparent bg-red-500/15 text-red-600 dark:text-red-400',
-        high: 'border-transparent bg-orange-500/15 text-orange-600 dark:text-orange-400',
-        success: 'border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+        default: 'border-border bg-well text-ink',
+        muted: 'border-transparent bg-well text-muted-foreground',
+        outline: 'border-border bg-card text-ink',
+        // Severity: one ramp, darkest = most severe.
+        critical: 'border-[#c42b1c] bg-[#c42b1c] text-white',
+        high: 'border-[#f2c4bf] bg-[#fdf1ef] text-[#a32418]',
+        medium: 'border-[#f0d6b3] bg-[#fdf6ec] text-[#8a4a00]',
+        low: 'border-border bg-well text-[#4a4f57]',
+        // Status
+        success: 'border-[#bfe3cc] bg-[#eef8f1] text-[#127a3e]',
+        warning: 'border-[#f0d6b3] bg-[#fdf6ec] text-[#8a4a00]',
+        info: 'border-[#c9d2f6] bg-[#f0f3fd] text-[#2445d6]',
+        live: 'border-[#c9d2f6] bg-[#f0f3fd] text-[#2445d6]',
+        new: 'border-[#c9d2f6] bg-[#f0f3fd] text-[#2445d6]',
+        regressed: 'border-[#f2c4bf] bg-[#fdf1ef] text-[#a32418]',
       },
     },
     defaultVariants: { variant: 'default' },

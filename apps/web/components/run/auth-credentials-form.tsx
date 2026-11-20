@@ -3,10 +3,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { KeyRound, Loader2, LogIn, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { ApiError } from '@/lib/api';
 import { projectApi, runApi } from '@/lib/queries';
 
@@ -45,20 +47,33 @@ export function AuthCredentialsForm({
   const queryClient = useQueryClient();
   const [username, setUsername] = useState('');
   const [secret, setSecret] = useState('');
+  const [useSession, setUseSession] = useState(false);
+  const [sessionLabel, setSessionLabel] = useState('SSO session');
+  const [sessionJson, setSessionJson] = useState('');
   const host = hostFrom(loginUrl);
 
   const saveAndContinue = useMutation({
     mutationFn: async () => {
-      await projectApi.createCredential(projectId, {
-        name: host ? `Login for ${host}` : 'Application login',
-        username,
-        secret,
-      });
+      if (useSession) {
+        await projectApi.createCredential(projectId, {
+          name: host ? `Session for ${host}` : 'Saved session',
+          type: 'STORAGE_STATE',
+          username: sessionLabel,
+          secret: sessionJson,
+        });
+      } else {
+        await projectApi.createCredential(projectId, {
+          name: host ? `Login for ${host}` : 'Application login',
+          username,
+          secret,
+        });
+      }
       return runApi.retry(runId);
     },
     onSuccess: async () => {
       setUsername('');
       setSecret('');
+      setSessionJson('');
       await queryClient.invalidateQueries({ queryKey: ['run', runId] });
       toast.success('Credentials stored. Resuming the audit.');
     },
@@ -67,12 +82,15 @@ export function AuthCredentialsForm({
   });
 
   return (
-    <Card className="mb-6 border-primary/40">
+    <Card className="mb-6">
       <CardHeader>
-        <CardTitle>Login credentials required</CardTitle>
+        <div className="flex items-center gap-2">
+          <KeyRound className="size-4 text-muted-foreground" aria-hidden />
+          <CardTitle>Login credentials required</CardTitle>
+        </div>
         <CardDescription>
-          The app opened a login page. Username and password are encrypted and stored on this project, then the
-          audit continues. The secret is never shown again.
+          The app opened a login page. Username and password (or a saved session) are encrypted and stored on this
+          project, then the audit continues. The secret is never shown again.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -84,8 +102,43 @@ export function AuthCredentialsForm({
           }}
         >
           {loginUrl ? (
-            <p className="mono sm:col-span-2 truncate text-xs text-muted-foreground">{loginUrl}</p>
+            <p className="mono truncate rounded-md border border-border bg-well px-3 py-2 text-[12px] text-ink sm:col-span-2">
+              {loginUrl}
+            </p>
           ) : null}
+          <label className="flex w-fit cursor-pointer items-center gap-2 text-sm sm:col-span-2">
+            <input type="checkbox" className="size-4 accent-[var(--cobalt)]" checked={useSession} onChange={(event) => setUseSession(event.target.checked)} />
+            Use a saved session instead (SSO/MFA)
+          </label>
+          {useSession ? (
+            <>
+              <p className="text-[13px] text-muted-foreground sm:col-span-2">
+                For SSO/MFA apps: log in once with Playwright and save context.storageState() to JSON.
+              </p>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="audit-session-label">Label</Label>
+                <Input
+                  id="audit-session-label"
+                  value={sessionLabel}
+                  onChange={(event) => setSessionLabel(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="audit-session-json">Storage state JSON</Label>
+                <Textarea
+                  id="audit-session-json"
+                  className="mono min-h-32 text-[12px]"
+                  placeholder='{"cookies": [...], "origins": [...]}'
+                  maxLength={1_000_000}
+                  value={sessionJson}
+                  onChange={(event) => setSessionJson(event.target.value)}
+                  required
+                />
+              </div>
+            </>
+          ) : (
+            <>
           <div className="space-y-2">
             <Label htmlFor="audit-username">Username</Label>
             <Input
@@ -107,8 +160,16 @@ export function AuthCredentialsForm({
               required
             />
           </div>
+            </>
+          )}
           <div className="sm:col-span-2">
-            <Button type="submit" disabled={saveAndContinue.isPending || !username || !secret}>
+            <Button
+              type="submit"
+              disabled={
+                saveAndContinue.isPending || (useSession ? !sessionLabel || !sessionJson : !username || !secret)
+              }
+            >
+              {saveAndContinue.isPending ? <Loader2 className="animate-spin" /> : <LogIn />}
               {saveAndContinue.isPending ? 'Saving…' : 'Save and continue audit'}
             </Button>
           </div>
@@ -130,9 +191,12 @@ export function RetryLoginButton({ runId }: { runId: string }) {
   });
 
   return (
-    <Card className="mb-6 border-primary/40">
+    <Card className="mb-6">
       <CardHeader>
-        <CardTitle>Retry login</CardTitle>
+        <div className="flex items-center gap-2">
+          <RotateCcw className="size-4 text-muted-foreground" aria-hidden />
+          <CardTitle>Retry login</CardTitle>
+        </div>
         <CardDescription>
           The login form uses an email address field. Retry this run with the credentials already stored on the
           project.
@@ -140,6 +204,7 @@ export function RetryLoginButton({ runId }: { runId: string }) {
       </CardHeader>
       <CardContent>
         <Button onClick={() => retry.mutate()} disabled={retry.isPending}>
+          {retry.isPending ? <Loader2 className="animate-spin" /> : <RotateCcw />}
           {retry.isPending ? 'Retrying…' : 'Retry audit'}
         </Button>
       </CardContent>

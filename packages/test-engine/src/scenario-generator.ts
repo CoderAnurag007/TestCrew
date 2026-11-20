@@ -1,5 +1,6 @@
+import { isSkipLink } from './catalog.js';
 import type { DiscoveredElement, GeneratedTestCase, TestStep } from '@auditor/shared';
-import { generatedTestCaseSchema } from '@auditor/shared';
+import { generatedTestCaseSchema, valueFor } from '@auditor/shared';
 import type { PlannedScenario } from './test-planner.js';
 
 let stepCounter = 0;
@@ -23,7 +24,8 @@ export class ScenarioGenerator {
     const byId = new Map(input.catalog.map((item) => [item.id, item]));
     const tests: GeneratedTestCase[] = [];
     for (const scenario of input.scenarios) {
-      const elements = scenario.elementIds.map((id) => byId.get(id)).filter((item): item is DiscoveredElement => Boolean(item));
+      const elements =
+        scenario.elements ?? scenario.elementIds.map((id) => byId.get(id)).filter((item): item is DiscoveredElement => Boolean(item));
       if (elements.length === 0) {
         if (scenario.targetUrl) {
           const generated = this.fromVisitedScreen(scenario, input.baseUrl);
@@ -195,6 +197,13 @@ export class ScenarioGenerator {
       if (!target?.href && !target?.selectors) {
         return null;
       }
+      if (target.href && /^\s*(tel|mailto|sms|javascript|fax|skype|whatsapp):/i.test(target.href)) {
+        // Phone, mail and app links open another program; there is no page to check.
+        return null;
+      }
+      if (isSkipLink(target.label, target.href)) {
+        return null;
+      }
       const origin = startUrl(elements, baseUrl);
       const steps: TestStep[] = [
         step({
@@ -204,7 +213,20 @@ export class ScenarioGenerator {
           value: origin,
         }),
       ];
-      if (target.selectors) {
+      // Menu items live inside a menu that is closed when the page loads; clicking them
+      // by role times out. Follow their link instead, which is what the item does.
+      const menuLink = target.selectors?.role === 'menuitem' && target.href && !/^\s*#/.test(target.href);
+      if (menuLink) {
+        const destination = new URL(target.href!, origin).toString();
+        steps.push(
+          step({
+            type: 'navigate',
+            description: `Follow the menu item ${target.label}`,
+            href: destination,
+            value: destination,
+          }),
+        );
+      } else if (target.selectors) {
         steps.push(
           step({
             type: 'click',
@@ -224,15 +246,14 @@ export class ScenarioGenerator {
             assertion: { kind: 'url', operator: 'contains', expected: path },
           }),
         );
-      } else {
-        steps.push(
-          step({
-            type: 'assert',
-            description: 'Navigation should not throw a page error',
-            assertion: { kind: 'page_error', operator: 'absent' },
-          }),
-        );
       }
+      steps.push(
+        step({
+          type: 'assert',
+          description: 'The destination should not throw an uncaught error',
+          assertion: { kind: 'page_error', operator: 'absent' },
+        }),
+      );
       if (scenario.category === 'ERROR_HANDLING') {
         steps.push(
           step({
@@ -276,12 +297,27 @@ export class ScenarioGenerator {
       ];
       if (scenario.category === 'HAPPY_PATH') {
         for (const field of fields) {
+          const value = valueFor({
+            inputType: field.inputType,
+            name: field.selectors.name,
+            label: field.label,
+            autocomplete: field.constraints?.autocomplete,
+            min: field.constraints?.min,
+            max: field.constraints?.max,
+            minLength: field.constraints?.minLength,
+            maxLength: field.constraints?.maxLength,
+            pattern: field.constraints?.pattern,
+          });
+          if (value === null) {
+            // Payment or identity field: never typed into.
+            continue;
+          }
           steps.push(
             step({
               type: 'type',
               description: `Fill discovered field ${field.label}`,
               selectors: field.selectors,
-              value: field.inputType === 'email' ? 'auditor@example.com' : 'Ada Auditor',
+              value,
               discoveredElementId: field.id,
             }),
           );
@@ -311,6 +347,7 @@ export class ScenarioGenerator {
         preconditions: ['Authenticated browser session'],
         requiresAuth: true,
         flowName: scenario.flowName,
+        mutates: true,
         steps,
         expectedResults:
           scenario.category === 'VALIDATION'
@@ -321,7 +358,15 @@ export class ScenarioGenerator {
 
     if (scenario.category === 'EMPTY_STATE') {
       const search = elements[0];
-      const submit = catalog.find((item) => item.selectors.testId === 'search-submit' || /search/i.test(item.label));
+      // A separate search button, never the search box itself or another text field.
+      const submit = catalog.find(
+        (item) =>
+          item !== search &&
+          item.selectors.primary !== search?.selectors.primary &&
+          (item.selectors.testId === 'search-submit' ||
+            (/search/i.test(item.label) &&
+              (item.type === 'button' || item.type === 'submit' || (item.selectors.role ?? '') === 'button' || (item.inputType ?? '') === 'submit'))),
+      );
       if (!search) {
         return null;
       }

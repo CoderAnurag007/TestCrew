@@ -63,6 +63,8 @@ export async function registerEnvironmentRoutes(app: FastifyInstance): Promise<v
             projectId: project.id,
             name: body.name,
             baseUrl: body.baseUrl,
+            kind: body.kind,
+            safetyMode: body.safetyMode ?? undefined,
           },
         });
         await writeAuditLog(app.prisma, request, {
@@ -93,6 +95,16 @@ export async function registerEnvironmentRoutes(app: FastifyInstance): Promise<v
       const { id, environmentId } = environmentParamsSchema.parse(request.params);
       const { project } = await requireProjectAccess(request, id, 'ADMIN');
       const body = updateEnvironmentBodySchema.parse(request.body);
+      if (body.baseUrl) {
+        try {
+          await assertSafeNavigationTarget(body.baseUrl, { allowPrivate: project.allowPrivateTargets });
+        } catch (error) {
+          if (error instanceof UnsafeTargetError) {
+            throw new HttpError(400, error.message);
+          }
+          throw error;
+        }
+      }
       const existing = await app.prisma.environment.findFirst({
         where: {
           id: environmentId,
@@ -108,6 +120,8 @@ export async function registerEnvironmentRoutes(app: FastifyInstance): Promise<v
         data: {
           name: body.name,
           baseUrl: body.baseUrl,
+          kind: body.kind,
+          safetyMode: body.safetyMode,
         },
       });
       await writeAuditLog(app.prisma, request, {

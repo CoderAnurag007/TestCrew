@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import { LandingPage } from '@/components/landing/landing-page';
 
 export const metadata: Metadata = {
-  title: 'AI App Auditor — Autonomous quality audits',
+  title: { absolute: 'TestCrew · Your app, audited by an AI QA engineer' },
   description:
-    'Explore web apps, generate executable tests, surface findings, and score quality from one control plane.',
+    'TestCrew explores your web app, writes and runs tests from what it finds, and reports what is broken with evidence.',
 };
 
 export default function HomePage() {
