@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import {
+  planIdSchema,
   brandingBodySchema,
   findingParamsSchema,
   findingSteps,
@@ -19,6 +20,7 @@ import {
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { writeAuditLog } from '../../lib/audit.js';
+import { assertCadence, assertDevices, assertFeature, getUsage } from '../../lib/plans.js';
 import { HttpError } from '../../lib/http-error.js';
 import { requireAuth, requireOrgRole, requireProjectAccess } from '../../middleware/auth.js';
 
@@ -35,6 +37,10 @@ export async function registerLaunchRoutes(app: FastifyInstance, send: Fetch = f
     const { id } = projectIdParamsSchema.parse(request.params);
     const { project } = await requireProjectAccess(request, id, 'ADMIN');
     const body = monitoringBodySchema.parse(request.body ?? {});
+    const usage = await getUsage(app.prisma, project.organizationId);
+    assertCadence(usage, body.cadence);
+    if (body.cadence) assertDevices(usage, body.devices);
+    if (body.alerts.emails.length) assertFeature(usage, 'alerts');
     if (body.environmentId) {
       const environment = await app.prisma.environment.findFirst({
         where: { id: body.environmentId, projectId: project.id },
@@ -83,6 +89,7 @@ export async function registerLaunchRoutes(app: FastifyInstance, send: Fetch = f
     const { id } = projectIdParamsSchema.parse(request.params);
     const { project } = await requireProjectAccess(request, id, 'ADMIN');
     const body = integrationBodySchema.parse(request.body);
+    assertFeature(await getUsage(app.prisma, project.organizationId), body.provider === 'slack' || body.provider === 'webhook' ? 'alerts' : 'tickets');
     const existing = await app.prisma.projectIntegration.findUnique({
       where: { projectId_provider: { projectId: project.id, provider: body.provider } },
     });
@@ -163,6 +170,7 @@ export async function registerLaunchRoutes(app: FastifyInstance, send: Fetch = f
     const { runId, findingId } = findingParamsSchema.parse(request.params);
     const { provider } = z.object({ provider: z.enum(TICKET_PROVIDERS) }).parse(request.body ?? {});
     const finding = await findFinding(app, request, runId, findingId);
+    assertFeature(await getUsage(app.prisma, finding.organizationId), 'tickets');
     if (finding.ticketUrl) {
       return { provider: finding.ticketProvider, url: finding.ticketUrl, existing: true };
     }
@@ -229,6 +237,7 @@ export async function registerLaunchRoutes(app: FastifyInstance, send: Fetch = f
   app.patch('/organizations/:id/branding', async (request) => {
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     await requireOrgRole(request, id, 'ADMIN');
+    assertFeature(await getUsage(app.prisma, id), 'branding');
     const body = brandingBodySchema.parse(request.body ?? {});
     const clean = (value: string | null | undefined) => (value === undefined ? undefined : value?.trim() || null);
     const org = await app.prisma.organization.update({
@@ -247,6 +256,25 @@ export async function registerLaunchRoutes(app: FastifyInstance, send: Fetch = f
       organizationId: id,
     });
     return brandView(org);
+  });
+
+  /* ------------------------------------------------------- plan and usage */
+
+  app.get('/organizations/:id/usage', async (request) => {
+    const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+    await requireOrgRole(request, id, 'VIEWER');
+    return getUsage(app.prisma, id);
+  });
+
+  /** Until checkout is connected, plans can be switched by hand outside production. */
+  app.post('/organizations/:id/plan', async (request) => {
+    if (app.env.NODE_ENV === 'production') throw new HttpError(404, 'Not found');
+    const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+    await requireOrgRole(request, id, 'OWNER');
+    const { plan } = z.object({ plan: planIdSchema }).parse(request.body ?? {});
+    await app.prisma.organization.update({ where: { id }, data: { plan, ...(plan !== 'FREE' ? { trialEndsAt: null } : {}) } });
+    await writeAuditLog(app.prisma, request, { action: 'organization.plan', resourceType: 'Organization', resourceId: id, organizationId: id, metadata: { plan } });
+    return getUsage(app.prisma, id);
   });
 
   /* --------------------------------------------------------- public report */
@@ -272,7 +300,9 @@ export async function registerLaunchRoutes(app: FastifyInstance, send: Fetch = f
     const order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
     findings.sort((a, b) => order.indexOf(a.severity) - order.indexOf(b.severity));
     const report: PublicReport = {
-      brand: brandView(run.organization),
+      brand: (await getUsage(app.prisma, run.organizationId)).limits.branding
+        ? brandView(run.organization)
+        : { name: 'Snaghunt', logoUrl: null, color: null, footer: null },
       project: { name: run.project.name, baseUrl: run.baseUrlOverride ?? run.environment?.baseUrl ?? run.project.baseUrl },
       run: {
         status: run.status,

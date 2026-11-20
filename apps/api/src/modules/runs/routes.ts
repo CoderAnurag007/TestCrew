@@ -1,3 +1,4 @@
+import { assertCanAudit, getUsage } from '../../lib/plans.js';
 import {
   aiUsageSchema,
   coverageStatsSchema,
@@ -164,6 +165,8 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
           throw new HttpError(404, 'Run to replay not found in this project');
         }
       }
+
+      assertCanAudit(await getUsage(app.prisma, project.organizationId), body.device ?? 'desktop');
 
       const run = await app.prisma.run.create({
         data: {

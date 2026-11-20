@@ -104,7 +104,7 @@ export class UXAnalysisAgent {
       return {
         analysis: heuristic,
         promptVersion: UX_ANALYSIS_PROMPT_VERSION,
-        model: this.router.current().name,
+        model: `${this.router.current().name}:failed`,
         promptTokens: 0,
         completionTokens: 0,
         latencyMs: 0,

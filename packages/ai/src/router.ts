@@ -126,7 +126,7 @@ export function createModelRouter(options: {
   const wantOpenAi = provider === 'openai' || (provider === 'auto' && !geminiKey && Boolean(openaiKey));
 
   if (wantGemini && geminiKey) {
-    return new ModelRouter(new GeminiProvider({ apiKey: geminiKey, model: geminiModel, visionModel: options.visionModel }), {
+    return new ModelRouter(new GeminiProvider({ apiKey: geminiKey, model: geminiModel, visionModel: options.visionModel, fallbackModel: process.env.GEMINI_FALLBACK_MODEL || undefined }), {
       default: geminiModel,
       vision: options.visionModel ?? geminiModel,
       summary: options.summaryModel ?? geminiModel,

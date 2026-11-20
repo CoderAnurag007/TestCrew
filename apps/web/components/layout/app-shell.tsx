@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useSession } from '@/components/session-provider';
+import { PlanLimitDialog, TrialNotice } from '@/components/layout/plan-notices';
 import { Brand, BrandMark } from '@/components/shell/brand';
 import {
   NEW_PROJECT_EVENT,
@@ -105,6 +106,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
+      <PlanLimitDialog />
     </div>
   );
 }
@@ -142,6 +144,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       <div className="mt-auto space-y-1 border-t border-border p-2">
+        <TrialNotice />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

@@ -57,7 +57,7 @@ export class IntentCompiler {
     const active = input.intents.filter((intent) => intent.enabled !== false);
     const base: Omit<IntentCompilerResult, 'intents'> = {
       promptVersion: INTENT_COMPILER_PROMPT_VERSION,
-      model: this.router.current().name,
+      model: 'heuristic',
       promptTokens: 0,
       completionTokens: 0,
       latencyMs: 0,
@@ -155,6 +155,7 @@ export class IntentCompiler {
       const message = error instanceof Error ? error.message : 'AI request failed';
       return {
         ...base,
+        model: `${this.router.current().name}:failed`,
         latencyMs: Date.now() - started,
         intents: active.map((intent) => ({
           intentId: intent.id,

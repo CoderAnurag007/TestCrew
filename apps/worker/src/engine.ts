@@ -1,5 +1,5 @@
 import type { ObjectStorage } from '@auditor/analyzer';
-import { RecordingExplorer, type ExplorerLike, type ModelRouter, type RecordedDecision } from '@auditor/ai';
+import { createModelRouter, ExplorerAgent, RecordingExplorer, type ExplorerLike, type ModelRouter, type RecordedDecision } from '@auditor/ai';
 import {
   BrowserManager,
   executeCandidateAction,
@@ -14,6 +14,7 @@ import {
   type SafetyGuard,
   runWithDevice,
 } from '@auditor/browser';
+import { orgUsage } from './plan-usage.js';
 import { asStringArray, callResetHook, resolveSafetyMode } from './safety-mode.js';
 import type { Prisma, PrismaClient, SecretStore } from '@auditor/database';
 import {
@@ -175,6 +176,24 @@ export async function startStage(
   });
 }
 
+/**
+ * Once a workspace has used its monthly AI budget, its audits keep running on
+ * the built-in rules instead of the AI, so one account can't run up the bill.
+ */
+async function withinAiBudget(deps: AuditDependencies, job: AuditJobData): Promise<AuditDependencies> {
+  const usage = await orgUsage(deps.prisma, job.organizationId).catch(() => null);
+  if (!usage || usage.aiSpendUsd < usage.limits.aiBudgetUsd) return deps;
+  deps.logger.warn({ runId: job.runId, spent: usage.aiSpendUsd, budget: usage.limits.aiBudgetUsd }, 'monthly AI budget used up; running without AI');
+  await appendEvent(deps.prisma, {
+    organizationId: job.organizationId,
+    runId: job.runId,
+    kind: 'info',
+    message: 'This workspace has used its AI budget for the month, so this audit uses the built-in checks only.',
+  }).catch(() => undefined);
+  const rules = createModelRouter({ provider: 'heuristic', model: 'heuristic' });
+  return { ...deps, ai: rules, explorer: new ExplorerAgent(rules) };
+}
+
 export async function executeAuditRun(
   deps: AuditDependencies,
   job: AuditJobData,
@@ -182,7 +201,7 @@ export async function executeAuditRun(
 ): Promise<void> {
   // Every browser opened during this run uses the run's device (desktop, phone, Safari, iPhone).
   const target = await deps.prisma.run.findUnique({ where: { id: job.runId }, select: { device: true } });
-  return runWithDevice(target?.device, () => executeAuditRunOnDevice(deps, job, options));
+  return runWithDevice(target?.device, async () => executeAuditRunOnDevice(await withinAiBudget(deps, job), job, options));
 }
 
 async function executeAuditRunOnDevice(

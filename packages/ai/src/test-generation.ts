@@ -54,7 +54,7 @@ export class TestGenerationAgent {
       return {
         tests: [],
         promptVersion: TEST_GENERATION_PROMPT_VERSION,
-        model: this.router.current().name,
+        model: 'heuristic',
         promptTokens: 0,
         completionTokens: 0,
         latencyMs: 0,
@@ -110,7 +110,7 @@ export class TestGenerationAgent {
       return {
         tests: [],
         promptVersion: TEST_GENERATION_PROMPT_VERSION,
-        model: this.router.current().name,
+        model: `${this.router.current().name}:failed`,
         promptTokens: 0,
         completionTokens: 0,
         latencyMs: Date.now() - started,

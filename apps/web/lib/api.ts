@@ -1,5 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
+export const PLAN_LIMIT_EVENT = 'snaghunt:plan-limit';
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -31,6 +33,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     | undefined;
 
   if (!response.ok) {
+    if (response.status === 402 && typeof window !== 'undefined') {
+      // A plan limit was hit: the app shell shows an upgrade prompt.
+      window.dispatchEvent(new CustomEvent(PLAN_LIMIT_EVENT, { detail: body?.message ?? 'This needs a bigger plan.' }));
+    }
     throw new ApiError(response.status, body);
   }
 

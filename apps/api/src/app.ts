@@ -79,6 +79,7 @@ export async function buildApp(env: ApiEnv = loadApiEnv()) {
       return reply.status(error.statusCode).send({
         statusCode: error.statusCode,
         error: error.error,
+        ...('code' in error && typeof error.code === 'string' ? { code: error.code } : {}),
         message: error.message,
         requestId: request.id,
       });

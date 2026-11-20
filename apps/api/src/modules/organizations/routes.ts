@@ -1,3 +1,4 @@
+import { TRIAL_DAYS } from '@auditor/shared';
 import {
   addMemberBodySchema,
   createOrganizationBodySchema,
@@ -47,6 +48,8 @@ export async function registerOrganizationRoutes(app: FastifyInstance): Promise<
           data: {
             name: body.name,
             slug: slugify(body.name),
+            // Every new workspace starts with the Pro plan free for two weeks, no card needed.
+            trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000),
           },
         });
         await tx.membership.create({

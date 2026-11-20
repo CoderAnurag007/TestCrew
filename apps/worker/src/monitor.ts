@@ -13,6 +13,7 @@ import {
 } from '@auditor/shared';
 import { assertSafeNavigationTarget } from '@auditor/shared/ssrf';
 import type { AuditDependencies } from './engine.js';
+import { orgUsage } from './plan-usage.js';
 
 /** Starts runs for monitored projects and sends alerts when runs finish. */
 
@@ -82,6 +83,20 @@ export async function startDueMonitors(
       continue;
     }
 
+    // The plan may have changed since monitoring was set up.
+    const usage = await orgUsage(deps.prisma, project.organizationId, now);
+    if (!usage || !usage.limits.cadences.includes(project.monitorCadence as MonitorCadence)) {
+      deps.logger.info({ projectId: project.id }, 'scheduled audit skipped: the plan no longer includes this schedule');
+      continue;
+    }
+    const allowed = monitorDevices(project.monitorDevices).filter((device) => usage.limits.devices.includes(device));
+    const room = usage.limits.auditsPerMonth == null ? Infinity : usage.limits.auditsPerMonth - usage.audits;
+    const devices = allowed.slice(0, Math.max(0, room));
+    if (!devices.length) {
+      deps.logger.info({ projectId: project.id }, 'scheduled audit skipped: monthly audit limit reached');
+      continue;
+    }
+
     const owner = await deps.prisma.membership.findFirst({
       where: { organizationId: project.organizationId },
       orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
@@ -97,7 +112,7 @@ export async function startDueMonitors(
       select: { id: true },
     });
 
-    for (const device of monitorDevices(project.monitorDevices)) {
+    for (const device of devices) {
       const run = await deps.prisma.run.create({
         data: {
           organizationId: project.organizationId,

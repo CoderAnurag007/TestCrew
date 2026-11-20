@@ -104,8 +104,11 @@ export function useStartAudit(projectId: string, project: ProjectDetail | undefi
       toast.success('Audit queued');
       router.push(`/runs/${run.id}`);
     },
-    onError: (error) =>
-      toast.error(error instanceof ApiError ? error.message : 'Could not start audit'),
+    onError: (error) => {
+      // Plan limits get their own upgrade dialog.
+      if (error instanceof ApiError && error.status === 402) return;
+      toast.error(error instanceof ApiError ? error.message : 'Could not start audit');
+    },
   });
 }
 

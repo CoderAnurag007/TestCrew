@@ -1,3 +1,4 @@
+import { assertCanAddSite, getUsage } from '../../lib/plans.js';
 import {
   createProjectBodySchema,
   environmentSchema,
@@ -87,6 +88,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     async (request, reply) => {
       const body = createProjectBodySchema.parse(request.body);
       const { membership } = await requireOrgRole(request, body.organizationId, 'MEMBER');
+      assertCanAddSite(await getUsage(app.prisma, body.organizationId));
       for (const target of [body.baseUrl, body.resetHookUrl, body.stagingUrl].filter((item): item is string => Boolean(item))) {
         try {
           await assertSafeNavigationTarget(target, { allowPrivate: body.allowPrivateTargets ?? false });

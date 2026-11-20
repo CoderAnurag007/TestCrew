@@ -6,6 +6,8 @@ import { createOrg, getApp, injectJson, registerUser } from './helpers.js';
 async function setup() {
   const user = await registerUser(`launch-${randomUUID()}@example.com`);
   const org = await createOrg(user.cookie, 'Launch Org');
+  // These tests cover every feature, so the workspace is on the top plan.
+  await (await getApp()).prisma.organization.update({ where: { id: org.body.id }, data: { plan: 'AGENCY' } });
   const project = await injectJson('POST', '/projects', {
     cookie: user.cookie,
     payload: { organizationId: org.body.id, name: 'Launch', baseUrl: 'https://example.com' },

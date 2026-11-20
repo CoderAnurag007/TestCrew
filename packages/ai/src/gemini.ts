@@ -12,6 +12,27 @@ export function parseJsonContent(content: string): unknown {
   return JSON.parse(trimmed);
 }
 
+export const DEFAULT_FALLBACK_MODEL = 'gemini-flash-lite-latest';
+const BUSY_COOLDOWN_MS = 10 * 60_000;
+/** Models that were overloaded recently, shared by every provider in this process. */
+const busyUntil = new Map<string, number>();
+
+class GeminiHttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'GeminiHttpError';
+  }
+}
+
+/** Overloaded, rate-limited or too slow: worth trying the fallback model. */
+function isBusyError(error: unknown): boolean {
+  if (error instanceof GeminiHttpError) return error.status === 429 || error.status >= 500;
+  return error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+}
+
 export class GeminiProvider implements AIProvider {
   readonly name = 'gemini';
 
@@ -21,6 +42,12 @@ export class GeminiProvider implements AIProvider {
       model: string;
       baseUrl?: string;
       visionModel?: string;
+      /**
+       * Used when the main model is overloaded (429/5xx) or too slow. Google's
+       * Flash models regularly return "high demand" while Lite answers in seconds;
+       * without this, every busy moment silently turned an audit into a rules-only one.
+       */
+      fallbackModel?: string;
     },
   ) {}
 
@@ -107,6 +134,35 @@ export class GeminiProvider implements AIProvider {
       retries?: number;
     },
   ): Promise<AiCompletion> {
+    const fallback = this.options.fallbackModel ?? DEFAULT_FALLBACK_MODEL;
+    const canFallBack = Boolean(fallback) && fallback !== model;
+    // After the main model was busy, go straight to the fallback for a while
+    // instead of making every call in the audit wait for the timeout again.
+    if (canFallBack && (busyUntil.get(model) ?? 0) > Date.now()) {
+      return this.requestOnce(fallback!, { ...input, timeoutMs: input.timeoutMs ?? 45_000, retries: input.retries ?? 1 });
+    }
+    try {
+      // Keep the first try short: a slow model is better replaced than waited for.
+      return await this.requestOnce(model, { ...input, timeoutMs: Math.min(input.timeoutMs ?? 45_000, 45_000), retries: input.retries ?? 1 });
+    } catch (error) {
+      if (!canFallBack || !isBusyError(error)) throw error;
+      busyUntil.set(model, Date.now() + BUSY_COOLDOWN_MS);
+      return this.requestOnce(fallback!, { ...input, timeoutMs: input.timeoutMs ?? 45_000, retries: input.retries ?? 1 });
+    }
+  }
+
+  private async requestOnce(
+    model: string,
+    input: {
+      system?: string;
+      contents: Array<{ role: string; parts: unknown[] }>;
+      json: boolean;
+      temperature?: number;
+      maxTokens?: number;
+      timeoutMs?: number;
+      retries?: number;
+    },
+  ): Promise<AiCompletion> {
     const started = Date.now();
     const root = this.options.baseUrl ?? 'https://generativelanguage.googleapis.com/v1beta';
     const response = await fetchWithRetry(`${root}/models/${encodeURIComponent(model)}:generateContent`, {
@@ -127,7 +183,7 @@ export class GeminiProvider implements AIProvider {
     }, { timeoutMs: input.timeoutMs, retries: input.retries });
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`Gemini request failed (${response.status}): ${body}`);
+      throw new GeminiHttpError(response.status, `Gemini request failed (${response.status}): ${body.slice(0, 500)}`);
     }
     const payload = (await response.json()) as {
       model?: string;

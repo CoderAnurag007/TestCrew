@@ -24,6 +24,8 @@ import type {
   MonitoringBody,
   PublicReport,
   TicketProvider,
+  PlanId,
+  Usage,
 } from '@auditor/shared';
 
 export const authApi = {
@@ -404,4 +406,15 @@ export const launchApi = {
   publicReport: (token: string) => api<PublicReport>(`/public/reports/${token}`),
   publicEvidenceUrl: (token: string, evidenceId: string) =>
     `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/public/reports/${token}/evidence/${evidenceId}`,
+};
+
+/* ---------------------------------------------------------- plan and usage */
+
+export type UsageView = Omit<Usage, 'trialEndsAt' | 'periodStart'> & { trialEndsAt: string | null; periodStart: string };
+
+export const planApi = {
+  usage: (organizationId: string) => api<UsageView>(`/organizations/${organizationId}/usage`),
+  /** Only available outside production, until checkout is connected. */
+  setPlan: (organizationId: string, plan: PlanId) =>
+    api<UsageView>(`/organizations/${organizationId}/plan`, { method: 'POST', body: JSON.stringify({ plan }) }),
 };
