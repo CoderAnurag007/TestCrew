@@ -47,6 +47,13 @@ export const apiEnvSchema = z.object({
   CREDENTIAL_ENCRYPTION_KEY: hex32,
   SENTRY_DSN: z.string().optional(),
   ARTIFACT_DIR: z.string().default('.artifacts'),
+  // The API reads the screenshots and reports the worker stores, so it needs the same storage.
+  S3_ENDPOINT: z.string().optional(),
+  S3_REGION: z.string().default('us-east-1'),
+  S3_BUCKET: z.string().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+  S3_FORCE_PATH_STYLE: z.string().optional(),
 });
 
 export type ApiEnv = {
@@ -64,16 +71,48 @@ export type ApiEnv = {
   CREDENTIAL_ENCRYPTION_KEY: string;
   SENTRY_DSN: string | undefined;
   ARTIFACT_DIR: string;
+  S3_ENDPOINT: string | undefined;
+  S3_REGION: string;
+  S3_BUCKET: string | undefined;
+  S3_ACCESS_KEY_ID: string | undefined;
+  S3_SECRET_ACCESS_KEY: string | undefined;
+  S3_FORCE_PATH_STYLE: boolean;
 };
+
+const blank = (value: string | undefined) => (value === '' ? undefined : value);
+
+/** The example values from .env.example: fine on a laptop, never in production. */
+const EXAMPLE_SECRETS = new Set([
+  'local-dev-session-secret-change-me-32',
+  '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+]);
+
+function assertProductionSecrets(env: { NODE_ENV: string; SESSION_SECRET?: string; CREDENTIAL_ENCRYPTION_KEY: string }) {
+  if (env.NODE_ENV !== 'production') return;
+  for (const [name, value] of [
+    ['SESSION_SECRET', env.SESSION_SECRET],
+    ['CREDENTIAL_ENCRYPTION_KEY', env.CREDENTIAL_ENCRYPTION_KEY],
+  ] as const) {
+    if (value && EXAMPLE_SECRETS.has(value)) {
+      throw new Error(`${name} is still the example value from .env.example. Generate a new one before running in production.`);
+    }
+  }
+}
 
 export function loadApiEnv(env: NodeJS.ProcessEnv = process.env): ApiEnv {
   const parsed = apiEnvSchema.parse(env);
+  assertProductionSecrets(parsed);
   return {
     ...parsed,
     COOKIE_SECURE: booleanFromEnv(parsed.COOKIE_SECURE, parsed.NODE_ENV === 'production'),
-    COOKIE_DOMAIN: parsed.COOKIE_DOMAIN === '' ? undefined : parsed.COOKIE_DOMAIN,
-    SENTRY_DSN: parsed.SENTRY_DSN === '' ? undefined : parsed.SENTRY_DSN,
+    COOKIE_DOMAIN: blank(parsed.COOKIE_DOMAIN),
+    SENTRY_DSN: blank(parsed.SENTRY_DSN),
     ARTIFACT_DIR: resolveArtifactDir(parsed.ARTIFACT_DIR),
+    S3_ENDPOINT: blank(parsed.S3_ENDPOINT),
+    S3_BUCKET: blank(parsed.S3_BUCKET),
+    S3_ACCESS_KEY_ID: blank(parsed.S3_ACCESS_KEY_ID),
+    S3_SECRET_ACCESS_KEY: blank(parsed.S3_SECRET_ACCESS_KEY),
+    S3_FORCE_PATH_STYLE: booleanFromEnv(parsed.S3_FORCE_PATH_STYLE, true),
   };
 }
 
@@ -121,6 +160,7 @@ export type WorkerEnv = {
 
 export function loadWorkerEnv(env: NodeJS.ProcessEnv = process.env): WorkerEnv {
   const parsed = workerEnvSchema.parse(env);
+  assertProductionSecrets(parsed);
   return {
     ...parsed,
     SENTRY_DSN: parsed.SENTRY_DSN === '' ? undefined : parsed.SENTRY_DSN,

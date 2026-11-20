@@ -70,7 +70,7 @@ export interface FixtureServer {
   close: () => Promise<void>;
 }
 
-export async function startFixture(port = 0): Promise<FixtureServer> {
+export async function startFixture(port = 0, host = '127.0.0.1'): Promise<FixtureServer> {
   const users: UserRow[] = [
     { id: '1', name: 'Ada Lovelace', email: 'ada@example.com' },
     { id: '2', name: 'Grace Hopper', email: 'grace@example.com' },
@@ -542,7 +542,7 @@ export async function startFixture(port = 0): Promise<FixtureServer> {
     res.end('Not found');
   });
 
-  await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve));
+  await new Promise<void>((resolve) => server.listen(port, host, resolve));
   const address = server.address();
   if (!address || typeof address === 'string') {
     throw new Error('Failed to bind fixture server');
@@ -559,6 +559,7 @@ export async function startFixture(port = 0): Promise<FixtureServer> {
 
 const entry = process.argv[1];
 if (entry && import.meta.url === pathToFileURL(entry).href) {
-  const server = await startFixture(4173);
+  // FIXTURE_HOST=0.0.0.0 lets other containers reach it (used by the deploy smoke test).
+  const server = await startFixture(Number(process.env.FIXTURE_PORT ?? 4173), process.env.FIXTURE_HOST ?? '127.0.0.1');
   console.log(`Fixture app listening on ${server.url}`);
 }

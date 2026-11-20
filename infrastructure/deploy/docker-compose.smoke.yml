@@ -1,0 +1,96 @@
+# The production images on plain HTTP plus the test shop, for the CI smoke test.
+#   docker compose -f infrastructure/deploy/docker-compose.smoke.yml up -d --build
+#   node infrastructure/deploy/smoke.mjs
+
+name: testcrew-smoke
+
+x-env: &env
+  NODE_ENV: production
+  LOG_LEVEL: info
+  DATABASE_URL: postgresql://testcrew:smoke-pass@postgres:5432/testcrew
+  REDIS_URL: redis://redis:6379
+  WEB_ORIGIN: http://localhost:3000
+  # Random values for this throwaway stack only.
+  SESSION_SECRET: smoke-session-secret-not-for-real-use-0001
+  CREDENTIAL_ENCRYPTION_KEY: a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90
+  COOKIE_SECURE: 'false'
+  ARTIFACT_DIR: /data/artifacts
+  AI_PROVIDER: heuristic
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: testcrew
+      POSTGRES_PASSWORD: smoke-pass
+      POSTGRES_DB: testcrew
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U testcrew']
+      interval: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      retries: 30
+
+  migrate:
+    build: &build
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile
+      target: migrate
+    environment:
+      DATABASE_URL: postgresql://testcrew:smoke-pass@postgres:5432/testcrew
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      <<: *build
+      target: api
+    environment: *env
+    ports:
+      - '3001:3001'
+    volumes:
+      - artifacts:/data/artifacts
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      <<: *build
+      target: worker
+    environment: *env
+    shm_size: 1gb
+    volumes:
+      - artifacts:/data/artifacts
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  fixture:
+    build:
+      <<: *build
+      target: fixture
+
+  web:
+    build:
+      <<: *build
+      target: web
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+    environment:
+      NODE_ENV: production
+    ports:
+      - '3000:3000'
+
+volumes:
+  artifacts:

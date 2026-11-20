@@ -1,0 +1,53 @@
+name: Deploy smoke test
+
+# Builds the production images and runs one real audit through them:
+# API → Redis queue → worker (Chrome in a container) → storage → API.
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/auditor-v2, main]
+    paths:
+      - 'infrastructure/**'
+      - 'apps/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-smoke.yml'
+
+concurrency:
+  group: deploy-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build images
+        run: docker compose -f infrastructure/deploy/docker-compose.smoke.yml build
+
+      - name: Start the stack
+        run: docker compose -f infrastructure/deploy/docker-compose.smoke.yml up -d --wait --wait-timeout 300 postgres redis api worker fixture web
+
+      - name: Run one real audit
+        env:
+          API_URL: http://localhost:3001
+          WEB_ORIGIN: http://localhost:3000
+          TARGET_URL: http://fixture:4173
+        run: node infrastructure/deploy/smoke.mjs
+
+      - name: Website answers
+        run: curl -fsS -o /dev/null -w "web %{http_code}\n" http://localhost:3000/
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f infrastructure/deploy/docker-compose.smoke.yml logs --tail 200 api worker migrate fixture
+
+      - name: Stop
+        if: always()
+        run: docker compose -f infrastructure/deploy/docker-compose.smoke.yml down -v
