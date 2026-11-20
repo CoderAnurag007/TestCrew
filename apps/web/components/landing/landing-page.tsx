@@ -9,6 +9,7 @@ import { FeaturesSection } from './features-section';
 import { HeroSection } from './hero-section';
 import { HowItWorksSection } from './how-it-works-section';
 import { LandingNav } from './landing-nav';
+import { PricingSection } from './pricing-section';
 
 export function LandingPage() {
   const { user, isLoading } = useSession();
@@ -24,6 +25,7 @@ export function LandingPage() {
         <HowItWorksSection />
         <EvidenceSection />
         <FeaturesSection />
+        <PricingSection signedIn={signedIn} />
         <CtaSection primaryHref={primaryHref} primaryLabel={primaryLabel} />
       </main>
       <footer>
@@ -35,6 +37,9 @@ export function LandingPage() {
             </Link>
             <Link href="#evidence" className="hover:text-[var(--night-ink)]">
               Evidence
+            </Link>
+            <Link href="#pricing" className="hover:text-[var(--night-ink)]">
+              Pricing
             </Link>
             <Link href={signedIn ? '/dashboard' : '/login'} className="hover:text-[var(--night-ink)]">
               {signedIn ? 'Dashboard' : 'Sign in'}

@@ -22,6 +22,9 @@ export function LandingNav({ signedIn, primaryHref, primaryLabel }: LandingNavPr
           <Link href="#features" className="hidden px-3 py-2 text-sm text-[var(--night-dim)] transition-colors hover:text-[var(--night-ink)] md:inline-block">
             Features
           </Link>
+          <Link href="#pricing" className="hidden px-3 py-2 text-sm text-[var(--night-dim)] transition-colors hover:text-[var(--night-ink)] md:inline-block">
+            Pricing
+          </Link>
           {!signedIn ? (
             <Link href="/login" className="px-3 py-2 text-sm text-[var(--night-dim)] transition-colors hover:text-[var(--night-ink)]">
               Sign in

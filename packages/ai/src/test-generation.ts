@@ -1,5 +1,9 @@
+import { describeAiError } from './errors.js';
+import { z } from 'zod';
 import {
-  generatedTestSuiteSchema,
+  assertionKindSchema,
+  assertionOperatorSchema,
+  generatedTestCaseSchema,
   type DiscoveredElement,
   type GeneratedTestCase,
   type SemanticPage,
@@ -23,6 +27,8 @@ export interface TestGenerationAgentResult {
   completionTokens: number;
   latencyMs: number;
   estimatedCostUsd: number;
+  /** Why the AI call failed, when it did. */
+  error?: string;
 }
 
 function selectorKey(selectors: SelectorMeta): string {
@@ -46,6 +52,66 @@ export function filterInventedSelectors(tests: GeneratedTestCase[], catalog: Dis
   );
 }
 
+const MAX_CATALOG = 160;
+
+/** The shape the AI returns: steps name elements by ref instead of copying selectors. */
+const aiAssertionSchema = z
+  .object({
+    kind: assertionKindSchema,
+    operator: assertionOperatorSchema.optional(),
+    expected: z.union([z.string(), z.number(), z.boolean()]).optional(),
+    element: z.string().optional(),
+    statusCode: z.number().int().optional(),
+  })
+  .passthrough();
+const aiStepSchema = z
+  .object({
+    id: z.string().optional(),
+    type: z.string(),
+    description: z.string().optional(),
+    element: z.string().optional(),
+    href: z.string().nullable().optional(),
+    value: z.union([z.string(), z.number()]).optional(),
+    assertion: aiAssertionSchema.optional(),
+  })
+  .passthrough();
+const aiTestSuiteSchema = z.object({
+  tests: z.array(z.object({ steps: z.array(aiStepSchema) }).passthrough()),
+});
+
+function elementAt(ref: string | undefined, catalog: DiscoveredElement[]): DiscoveredElement | undefined {
+  const match = /^e(\d+)$/.exec(ref?.trim() ?? '');
+  return match ? catalog[Number(match[1])] : undefined;
+}
+
+/** Turns the AI's ref-based tests into real ones; drops any test that still doesn't fit. */
+export function hydrateTests(tests: Array<z.infer<typeof aiTestSuiteSchema>['tests'][number]>, catalog: DiscoveredElement[]): GeneratedTestCase[] {
+  const out: GeneratedTestCase[] = [];
+  for (const raw of tests) {
+    let broken = false;
+    const steps = raw.steps.map((step, index) => {
+      const element = elementAt(step.element, catalog);
+      if (step.element && !element) broken = true;
+      const assertElement = elementAt(step.assertion?.element, catalog);
+      if (step.assertion?.element && !assertElement) broken = true;
+      const { element: _ref, ...assertionRest } = step.assertion ?? ({} as Record<string, unknown>);
+      return {
+        id: step.id || `s${index + 1}`,
+        type: step.type,
+        description: step.description || `${step.type} step`,
+        ...(element ? { selectors: element.selectors, discoveredElementId: element.id } : {}),
+        ...(step.href ? { href: step.href } : step.type === 'navigate' && element?.href ? { href: element.href } : {}),
+        ...(step.value != null ? { value: String(step.value) } : {}),
+        ...(step.assertion ? { assertion: { ...assertionRest, ...(assertElement ? { selectors: assertElement.selectors } : {}) } } : {}),
+      };
+    });
+    if (broken) continue;
+    const parsed = generatedTestCaseSchema.safeParse({ ...raw, steps, source: 'ai' });
+    if (parsed.success) out.push(parsed.data);
+  }
+  return out;
+}
+
 export class TestGenerationAgent {
   constructor(private readonly router: ModelRouter) {}
 
@@ -63,6 +129,9 @@ export class TestGenerationAgent {
     }
 
     const started = Date.now();
+    // Element ids repeat across pages, so the AI refers to elements by their
+    // position ("e12") and the exact selectors are filled in from the catalog.
+    const catalog = input.catalog.slice(0, MAX_CATALOG);
     try {
       const result = await this.router.generateStructured(
         {
@@ -79,14 +148,14 @@ export class TestGenerationAgent {
                   title: state.title,
                   visited: state.visited,
                 })),
-                catalog: input.catalog.map((element) => ({
-                  id: element.id,
+                catalog: catalog.map((element, index) => ({
+                  ref: `e${index}`,
                   url: element.url,
                   type: element.type,
                   label: element.label,
                   href: element.href,
                   category: element.category,
-                  selectors: element.selectors,
+                  inputType: element.inputType,
                 })),
               }),
             },
@@ -95,10 +164,10 @@ export class TestGenerationAgent {
           temperature: 0,
           maxTokens: 4000,
         },
-        generatedTestSuiteSchema,
+        aiTestSuiteSchema,
       );
       return {
-        tests: filterInventedSelectors(result.data.tests, input.catalog),
+        tests: filterInventedSelectors(hydrateTests(result.data.tests, catalog), input.catalog),
         promptVersion: TEST_GENERATION_PROMPT_VERSION,
         model: result.model,
         promptTokens: result.promptTokens,
@@ -106,11 +175,12 @@ export class TestGenerationAgent {
         latencyMs: result.latencyMs || Date.now() - started,
         estimatedCostUsd: result.estimatedCostUsd,
       };
-    } catch {
+    } catch (error) {
       return {
         tests: [],
         promptVersion: TEST_GENERATION_PROMPT_VERSION,
         model: `${this.router.current().name}:failed`,
+        error: describeAiError(error),
         promptTokens: 0,
         completionTokens: 0,
         latencyMs: Date.now() - started,

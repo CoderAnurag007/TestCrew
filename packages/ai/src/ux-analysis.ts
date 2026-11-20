@@ -1,3 +1,4 @@
+import { describeAiError } from './errors.js';
 import { uxAnalysisSchema, type UxAnalysis, type UxFindingDraft } from '@auditor/shared';
 import { UX_ANALYSIS_PROMPT_VERSION, UX_ANALYSIS_SYSTEM_PROMPT } from './prompts.js';
 import type { ModelRouter } from './router.js';
@@ -57,6 +58,7 @@ export class UXAnalysisAgent {
     completionTokens: number;
     latencyMs: number;
     estimatedCostUsd: number;
+    error?: string;
   }> {
     const heuristic = { findings: heuristicUxFindings(input) };
     if (this.router.current().name === 'heuristic') {
@@ -100,11 +102,12 @@ export class UXAnalysisAgent {
         latencyMs: result.latencyMs,
         estimatedCostUsd: result.estimatedCostUsd,
       };
-    } catch {
+    } catch (error) {
       return {
         analysis: heuristic,
         promptVersion: UX_ANALYSIS_PROMPT_VERSION,
         model: `${this.router.current().name}:failed`,
+        error: describeAiError(error),
         promptTokens: 0,
         completionTokens: 0,
         latencyMs: 0,

@@ -1,7 +1,7 @@
 import { installSafetyGuard, isThirdPartyTrackerError, runWithDevice, type BrowserManager, type SafetyPolicy } from '@auditor/browser';
 import type { Prisma } from '@auditor/database';
 import type { Page } from 'playwright';
-import { appendEvent, type AuditDependencies } from './engine.js';
+import { appendEvent, setRunStatus, type AuditDependencies } from './engine.js';
 
 /**
  * A fast first look (about two minutes) before the full audit: the home page and
@@ -223,6 +223,8 @@ export async function runQuickScan(
   },
 ): Promise<number> {
   const started = Date.now();
+  // Signing in is done; show the quick scan as its own step in the app.
+  await setRunStatus(deps.prisma, input.runId, 'DISCOVERING', { currentAction: 'Quick scan', currentUrl: input.targetUrl }).catch(() => undefined);
   await appendEvent(deps.prisma, {
     organizationId: input.organizationId,
     runId: input.runId,

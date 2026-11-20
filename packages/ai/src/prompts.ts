@@ -1,14 +1,36 @@
-export const TEST_GENERATION_PROMPT_VERSION = 'test-generation.v1';
+export const TEST_GENERATION_PROMPT_VERSION = 'test-generation.v3';
 export const FAILURE_ANALYSIS_PROMPT_VERSION = 'failure-analysis.v1';
-export const UX_ANALYSIS_PROMPT_VERSION = 'ux-analysis.v1';
+export const UX_ANALYSIS_PROMPT_VERSION = 'ux-analysis.v2';
 export const REPORT_SUMMARY_PROMPT_VERSION = 'report-summary.v1';
 
 export const TEST_GENERATION_SYSTEM_PROMPT = `You generate executable UI tests for an application auditor.
-You MUST only use selectors and element ids from the provided discovered catalog.
-Never invent CSS selectors, test ids, roles, or URLs.
-Every step that interacts with the UI must include selectors copied from the catalog.
+Each catalog element has a "ref" such as "e12". Refer to elements ONLY by their ref.
+Never invent elements, selectors or URLs.
+Every click, type and select step must name the element it uses.
 Prefer happy path, negative, validation, navigation, and error handling tests.
-Respond with JSON matching { "tests": GeneratedTestCase[] }.`;
+Write at most 8 tests. Never include payment, order placement, account deletion or logout steps.
+
+Respond with JSON only, exactly in this shape:
+{ "tests": [ {
+  "name": string,
+  "description": string,
+  "category": "HAPPY_PATH" | "NEGATIVE" | "VALIDATION" | "BOUNDARY" | "NAVIGATION" | "ERROR_HANDLING" | "EMPTY_STATE",
+  "priority": "HIGH" | "MEDIUM" | "LOW",
+  "risk": "SAFE" | "CAUTION" | "DESTRUCTIVE",
+  "preconditions": string[],
+  "expectedResults": string[] (at least one),
+  "requiresAuth": boolean,
+  "steps": [ {
+    "id": string (e.g. "s1"),
+    "type": "navigate" | "click" | "type" | "select" | "wait" | "assert" | "reload" | "back",
+    "description": string,
+    "element": catalog ref, e.g. "e12" (for click, type and select),
+    "href": string (for navigate; a URL from the catalog or states),
+    "value": string (text to type or option to select),
+    "assertion": { "kind": "url" | "text" | "visibility" | "existence" | "value" | "count" | "http", "operator": "equals" | "contains" | "matches" | "gte" | "lte" | "exists" | "absent", "expected": string | number | boolean, "element": catalog ref (optional, for value/visibility/existence/count) } (for assert steps)
+  } ] (at least one; the last step should be an assert)
+} ] }
+Return { "tests": [] } when the catalog has nothing worth testing.`;
 
 export const FAILURE_ANALYSIS_SYSTEM_PROMPT = `You analyze a failed application audit test.
 Use only the provided evidence. Do not invent selectors, URLs, or stack frames.
@@ -18,7 +40,17 @@ Respond with JSON matching the failure analysis schema.`;
 export const UX_ANALYSIS_SYSTEM_PROMPT = `You analyze UX quality of a web application from discovered pages and test outcomes.
 Every recommendation must include evidence and a confidence between 0 and 1.
 Do not invent UI that was not observed.
-Respond with JSON { "findings": UxFinding[] }.`;
+Respond with JSON only, exactly in this shape:
+{ "findings": [ {
+  "title": string (short, plain language),
+  "description": string (what is wrong and why it matters to a visitor),
+  "recommendation": string (how to fix it),
+  "confidence": number between 0 and 1,
+  "evidence": string[] (at least one observed fact, e.g. page text or a failed test name),
+  "url": string (optional, the page),
+  "component": string (optional)
+} ] }
+Return { "findings": [] } when there is nothing worth reporting.`;
 
 export const REPORT_SUMMARY_SYSTEM_PROMPT = `Write a short executive summary of an application audit.
 Use only the provided numeric statistics. Do not invent counts, scores, or findings.

@@ -1,3 +1,4 @@
+import { describeAiError } from './errors.js';
 import { failureAnalysisSchema, type FailureAnalysis, type FindingSeverity } from '@auditor/shared';
 import { FAILURE_ANALYSIS_PROMPT_VERSION, FAILURE_ANALYSIS_SYSTEM_PROMPT } from './prompts.js';
 import type { ModelRouter } from './router.js';
@@ -83,6 +84,7 @@ export class FailureAnalysisAgent {
     completionTokens: number;
     latencyMs: number;
     estimatedCostUsd: number;
+    error?: string;
   }> {
     const fallback = heuristicFailureAnalysis(input);
     if (this.router.current().name === 'heuristic') {
@@ -136,11 +138,12 @@ export class FailureAnalysisAgent {
         latencyMs: result.latencyMs,
         estimatedCostUsd: result.estimatedCostUsd,
       };
-    } catch {
+    } catch (error) {
       return {
         analysis: fallback,
         promptVersion: FAILURE_ANALYSIS_PROMPT_VERSION,
         model: `${this.router.current().name}:failed`,
+        error: describeAiError(error),
         promptTokens: 0,
         completionTokens: 0,
         latencyMs: 0,
