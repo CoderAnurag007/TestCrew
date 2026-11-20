@@ -280,9 +280,9 @@ export class SafetyGuard {
       await route
         .fulfill({
           status: 409,
-          headers: { 'x-testcrew-blocked': '1' },
+          headers: { 'x-snaghunt-blocked': '1' },
           contentType: 'text/html; charset=utf-8',
-          body: `<!doctype html><title>Blocked by TestCrew</title><h1>Blocked by TestCrew safety mode</h1><p>${escapeHtml(reason)}</p>`,
+          body: `<!doctype html><title>Blocked by Snaghunt</title><h1>Blocked by Snaghunt safety mode</h1><p>${escapeHtml(reason)}</p>`,
         })
         .catch(() => undefined);
       return;

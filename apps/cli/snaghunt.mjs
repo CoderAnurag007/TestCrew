@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// TestCrew CI client. No dependencies; needs Node 18+.
+// Snaghunt CI client. No dependencies; needs Node 18+.
 //
-//   TESTCREW_API_URL=https://auditor.example.com TESTCREW_TOKEN=tc_... \
-//     node testcrew.mjs run --project <projectId> --base-url https://pr-42.preview.example.com
+//   SNAGHUNT_API_URL=https://auditor.example.com SNAGHUNT_TOKEN=tc_... \
+//     node snaghunt.mjs run --project <projectId> --base-url https://pr-42.preview.example.com
 //
 // Exit codes: 0 gate passed, 1 gate failed, 2 the run failed or could not be started.
 import { realpathSync } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
-const HELP = `Usage: testcrew run --project <id> [options]
+const HELP = `Usage: snaghunt run --project <id> [options]
 
 Options:
   --base-url <url>     Audit this URL instead of the project's own (e.g. a preview deployment)
@@ -24,8 +24,8 @@ Options:
   --no-wait            Start the run and exit 0 without waiting
 
 Environment:
-  TESTCREW_API_URL     Base URL of the TestCrew API (required)
-  TESTCREW_TOKEN       Project API token, tc_... (required)
+  SNAGHUNT_API_URL     Base URL of the Snaghunt API (required)
+  SNAGHUNT_TOKEN       Project API token, tc_... (required)
 `;
 
 const TERMINAL = new Set(['COMPLETED', 'FAILED', 'CANCELLED']);
@@ -84,7 +84,7 @@ export function evaluateGate(summary, options) {
 
 export function markdownSummary(summary, gate, runUrl) {
   const lines = [];
-  lines.push(`## TestCrew audit: ${gate.passed ? 'passed' : gate.error ? 'error' : 'failed'}`);
+  lines.push(`## Snaghunt audit: ${gate.passed ? 'passed' : gate.error ? 'error' : 'failed'}`);
   lines.push('');
   lines.push(`Target: ${summary.baseUrl} · Safety mode: ${summary.safetyMode ?? 'n/a'} · Health score: **${summary.qualityScore ?? 'n/a'}**`);
   lines.push('');
@@ -108,9 +108,9 @@ export function markdownSummary(summary, gate, runUrl) {
 }
 
 async function api(path, init = {}) {
-  const base = (process.env.TESTCREW_API_URL ?? '').replace(/\/+$/, '');
-  const token = process.env.TESTCREW_TOKEN;
-  if (!base || !token) throw new Error('Set TESTCREW_API_URL and TESTCREW_TOKEN');
+  const base = (process.env.SNAGHUNT_API_URL ?? '').replace(/\/+$/, '');
+  const token = process.env.SNAGHUNT_TOKEN;
+  if (!base || !token) throw new Error('Set SNAGHUNT_API_URL and SNAGHUNT_TOKEN');
   const response = await fetch(`${base}${path}`, {
     ...init,
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', ...(init.headers ?? {}) },
@@ -166,7 +166,7 @@ async function main(argv) {
   }
 
   const gate = evaluateGate(summary, options);
-  const report = markdownSummary(summary, gate, process.env.TESTCREW_WEB_URL ? `${process.env.TESTCREW_WEB_URL.replace(/\/+$/, '')}/runs/${run.id}` : null);
+  const report = markdownSummary(summary, gate, process.env.SNAGHUNT_WEB_URL ? `${process.env.SNAGHUNT_WEB_URL.replace(/\/+$/, '')}/runs/${run.id}` : null);
   process.stdout.write(`\n${report}`);
   if (process.env.GITHUB_STEP_SUMMARY) {
     await appendFile(process.env.GITHUB_STEP_SUMMARY, report).catch(() => undefined);

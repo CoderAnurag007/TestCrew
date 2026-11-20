@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "bin": {
-    "testcrew": "./testcrew.mjs"
+    "snaghunt": "./snaghunt.mjs"
   },
   "scripts": {
-    "build": "node --check testcrew.mjs",
-    "typecheck": "node --check testcrew.mjs",
-    "lint": "node --check testcrew.mjs",
+    "build": "node --check snaghunt.mjs",
+    "typecheck": "node --check snaghunt.mjs",
+    "lint": "node --check snaghunt.mjs",
     "test": "vitest run"
   },
   "devDependencies": {

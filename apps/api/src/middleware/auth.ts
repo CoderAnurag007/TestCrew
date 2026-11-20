@@ -72,7 +72,7 @@ async function authenticateApiToken(request: FastifyRequest, raw: string): Promi
   request.apiToken = { id: token.id, projectId: token.projectId, organizationId: token.organizationId, name: token.name };
   request.currentUser = {
     id: token.createdById,
-    email: `api-token+${token.prefix}@testcrew.local`,
+    email: `api-token+${token.prefix}@snaghunt.local`,
     name: `API token ${token.name}`,
     memberships: [{ id: `token-${token.id}`, organizationId: token.organizationId, role: 'MEMBER', organization }],
   };

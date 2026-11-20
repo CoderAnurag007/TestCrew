@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* TestCrew is light-only. See DESIGN.md for the system these tokens implement. */
+/* Snaghunt is light-only. See DESIGN.md for the system these tokens implement. */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -190,7 +190,7 @@ p {
   display: none;
 }
 
-/* The element TestCrew is about to act on. */
+/* The element Snaghunt is about to act on. */
 .target-box {
   position: absolute;
   border: 2px solid var(--cobalt);

@@ -238,7 +238,7 @@ export function renderHtmlReport(input: HtmlReportInput): string {
 <header class="hero">
   <div class="wrap hero-grid">
     <div>
-      <p class="eyebrow">TestCrew audit report</p>
+      <p class="eyebrow">Snaghunt audit report</p>
       <h1>${esc(input.project.name)}</h1>
       <p class="target">${esc(input.project.baseUrl)}</p>
       <div class="meta">

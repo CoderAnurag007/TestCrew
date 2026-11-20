@@ -17,8 +17,8 @@ const message: AlertMessage = {
 
 describe('alerts', () => {
   it('says how many bugs are new and how many came back', () => {
-    expect(alertSubject(message)).toBe('TestCrew: 1 new bug, 1 came back on Shop');
-    expect(alertSubject({ ...message, kind: 'failed', findings: [] })).toBe('TestCrew: the audit of Shop could not finish');
+    expect(alertSubject(message)).toBe('Snaghunt: 1 new bug, 1 came back on Shop');
+    expect(alertSubject({ ...message, kind: 'failed', findings: [] })).toBe('Snaghunt: the audit of Shop could not finish');
   });
 
   it('writes a plain-text alert with the score and a link', () => {

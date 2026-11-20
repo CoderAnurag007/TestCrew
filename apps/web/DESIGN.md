@@ -1,6 +1,6 @@
-# TestCrew design system
+# Snaghunt design system
 
-TestCrew walks through someone's app and hands back evidence: what it clicked, what
+Snaghunt walks through someone's app and hands back evidence: what it clicked, what
 happened, what broke. The interface should feel like a precise inspection instrument
 and the report it prints — exact, calm, legible at a glance — not like a generic
 SaaS template.
@@ -79,7 +79,7 @@ The landing page and the sign-in and sign-up pages have their own surface, so th
 product has a world before you are inside it. The app itself stays on the light
 system above.
 
-- **Story.** TestCrew is a QA crew working through your site at night. The landing
+- **Story.** Snaghunt is a QA crew working through your site at night. The landing
   hero shows that literally: pages of a sample store floating in 3D, a work lamp
   moving from control to control, crosshairs and verdict tags lifting off the page.
   Then the "morning after" section switches to paper and hands you a case file:

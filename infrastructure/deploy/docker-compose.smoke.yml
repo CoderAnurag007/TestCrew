@@ -2,12 +2,12 @@
 #   docker compose -f infrastructure/deploy/docker-compose.smoke.yml up -d --build
 #   node infrastructure/deploy/smoke.mjs
 
-name: testcrew-smoke
+name: snaghunt-smoke
 
 x-env: &env
   NODE_ENV: production
   LOG_LEVEL: info
-  DATABASE_URL: postgresql://testcrew:smoke-pass@postgres:5432/testcrew
+  DATABASE_URL: postgresql://snaghunt:smoke-pass@postgres:5432/snaghunt
   REDIS_URL: redis://redis:6379
   WEB_ORIGIN: http://localhost:3000
   # Random values for this throwaway stack only.
@@ -21,11 +21,11 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: testcrew
+      POSTGRES_USER: snaghunt
       POSTGRES_PASSWORD: smoke-pass
-      POSTGRES_DB: testcrew
+      POSTGRES_DB: snaghunt
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U testcrew']
+      test: ['CMD-SHELL', 'pg_isready -U snaghunt']
       interval: 3s
       retries: 30
 
@@ -42,7 +42,7 @@ services:
       dockerfile: infrastructure/docker/Dockerfile
       target: migrate
     environment:
-      DATABASE_URL: postgresql://testcrew:smoke-pass@postgres:5432/testcrew
+      DATABASE_URL: postgresql://snaghunt:smoke-pass@postgres:5432/snaghunt
     depends_on:
       postgres:
         condition: service_healthy

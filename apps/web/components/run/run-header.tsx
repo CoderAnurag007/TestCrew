@@ -129,7 +129,7 @@ export function RunHeader({ runId, run }: { runId: string; run: RunDetail | unde
 
   const downloadTests = useMutation({
     mutationFn: () => runApi.exportPlaywright(runId),
-    onSuccess: (blob) => saveBlob(blob, `testcrew-${runId}.spec.ts`),
+    onSuccess: (blob) => saveBlob(blob, `snaghunt-${runId}.spec.ts`),
     onError: (error) => toast.error(error instanceof ApiError ? error.message : 'Could not download tests'),
   });
 
@@ -247,7 +247,7 @@ export function RunHeader({ runId, run }: { runId: string; run: RunDetail | unde
 export function ReportActions({ runId }: { runId: string }) {
   const downloadReport = useMutation({
     mutationFn: () => runApi.reportHtml(runId),
-    onSuccess: (blob) => saveBlob(blob, `testcrew-report-${runId}.html`),
+    onSuccess: (blob) => saveBlob(blob, `snaghunt-report-${runId}.html`),
     onError: (error) => toast.error(error instanceof ApiError ? error.message : 'Could not download the report'),
   });
   return (

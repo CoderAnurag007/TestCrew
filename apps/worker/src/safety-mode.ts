@@ -109,7 +109,7 @@ export async function callResetHook(
     await assertSafeNavigationTarget(input.url, { allowPrivate: input.allowPrivate });
     const response = await fetch(input.url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-testcrew-run-id': input.runId },
+      headers: { 'content-type': 'application/json', 'x-snaghunt-run-id': input.runId },
       body: JSON.stringify({ runId: input.runId, event: 'before_audit' }),
       redirect: 'manual',
       signal: AbortSignal.timeout(30_000),

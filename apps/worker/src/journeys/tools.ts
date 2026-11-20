@@ -144,14 +144,14 @@ async function makeFiles(page: Page, kind: SampleKind, count: number): Promise<S
   }
   if (!buffer?.length) return null;
   return Array.from({ length: count }, (_, index) => ({
-    name: `testcrew-sample${count > 1 ? `-${index + 1}` : ''}.${kind.ext}`,
+    name: `snaghunt-sample${count > 1 ? `-${index + 1}` : ''}.${kind.ext}`,
     mimeType: kind.mimeType,
     buffer: buffer!,
   }));
 }
 
 const ACTION_SCRIPT = `(slug) => {
-  document.querySelectorAll('[data-testcrew-action]').forEach((el) => el.removeAttribute('data-testcrew-action'));
+  document.querySelectorAll('[data-snaghunt-action]').forEach((el) => el.removeAttribute('data-snaghunt-action'));
   const ACTION = /\\b(convert|compress|merge|combine|split|extract|resize|crop|rotate|flip|process|start|run|generate|create|make|export|encode|decode|trim|cut|join|optimi[sz]e|reduce|remove|clean|protect|unlock|sign|watermark|number|organi[sz]e|repair|transcribe|translate|format|beautify|minify|count|calculate|download|save|apply|go)\\b/i;
   const AVOID = /\\b(choose|select|browse|pick|upload|add (more )?files?|clear|reset|cancel|remove (this |the )?files?|delete|close|back|menu|dark mode|light mode|theme|share|copy link|sign ?in|log ?in)\\b/i;
   const words = slug.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && w !== 'to');
@@ -174,7 +174,7 @@ const ACTION_SCRIPT = `(slug) => {
     if (!best || score > best.score) best = { el, label, score };
   }
   if (!best) return null;
-  best.el.setAttribute('data-testcrew-action', '1');
+  best.el.setAttribute('data-snaghunt-action', '1');
   return best.label.slice(0, 80);
 }`;
 
@@ -184,7 +184,7 @@ async function findAction(page: Page, path: string, timeoutMs = 6_000): Promise<
   const deadline = Date.now() + timeoutMs;
   do {
     const label = (await page.evaluate(`(${ACTION_SCRIPT})(${JSON.stringify(slug)})`).catch(() => null)) as string | null;
-    if (label) return { locator: page.locator('[data-testcrew-action="1"]').first(), label };
+    if (label) return { locator: page.locator('[data-snaghunt-action="1"]').first(), label };
     await page.waitForTimeout(500);
   } while (Date.now() < deadline);
   return null;
@@ -202,7 +202,7 @@ interface PageSnapshot {
 const SNAPSHOT_SCRIPT = `(() => {
   const visible = (el) => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 1 && r.height > 1 && s.visibility !== 'hidden' && s.display !== 'none'; };
   const scope = document.querySelector('main, [role="main"], article') || document.body;
-  const links = Array.from(scope.querySelectorAll('a[download], a[href^="blob:"], a[href^="data:"]')).filter(visible).map((a, i) => { a.setAttribute('data-testcrew-result', String(i)); return (a.getAttribute('href') || '') + '|' + (a.getAttribute('download') || ''); });
+  const links = Array.from(scope.querySelectorAll('a[download], a[href^="blob:"], a[href^="data:"]')).filter(visible).map((a, i) => { a.setAttribute('data-snaghunt-result', String(i)); return (a.getAttribute('href') || '') + '|' + (a.getAttribute('download') || ''); });
   const media = Array.from(scope.querySelectorAll('img[src^="blob:"], img[src^="data:"], video[src^="blob:"], audio[src^="blob:"], canvas, iframe[src^="blob:"], object[data^="blob:"]')).filter(visible).map((el) => el.getAttribute('src') || el.getAttribute('data') || ('canvas:' + el.width + 'x' + el.height));
   const ERROR = /\\b(error|failed|fails|problem|unknown operation|went wrong|exception|couldn['’]?t|could not|cannot|can['’]?t|unable|invalid|unsupported|not supported|too (large|big)|corrupt(ed)?|wrong (file|format|type)|only [a-z0-9., ]+ files?)\\b/i;
   const messages = Array.from(scope.querySelectorAll('[role="alert"], [aria-live], .error, .alert, [class*="error" i], [class*="warning" i], [data-state="error"], output, p, small, span, div'))
@@ -213,7 +213,7 @@ const SNAPSHOT_SCRIPT = `(() => {
   // Result buttons ("Download", "Save PDF") that appear once the tool is done.
   const buttons = Array.from(scope.querySelectorAll('button, [role="button"], a[href]'))
     .filter((el) => visible(el) && !el.disabled && /\\b(download|save)\\b/i.test(el.innerText || el.getAttribute('aria-label') || ''))
-    .map((el, i) => { el.setAttribute('data-testcrew-result-button', String(i)); return (el.innerText || el.getAttribute('aria-label') || '').replace(/\\s+/g, ' ').trim().slice(0, 60) + '#' + i; });
+    .map((el, i) => { el.setAttribute('data-snaghunt-result-button', String(i)); return (el.innerText || el.getAttribute('aria-label') || '').replace(/\\s+/g, ' ').trim().slice(0, 60) + '#' + i; });
   const lines = Array.from(new Set((scope.innerText || '').split('\\n').map((t) => t.trim()).filter((t) => t.length > 2 && t.length < 200))).slice(0, 600);
   return { links, buttons, media, messages: Array.from(new Set(messages)).slice(0, 10), outputs, lines };
 })()`;
@@ -272,7 +272,7 @@ async function waitForOutcome(
       const newLink = now.links.findIndex((link) => !before.links.includes(link));
       if (newLink !== -1) {
         // The result is ready as a link; follow it like a visitor would.
-        const link = page.locator(`[data-testcrew-result="${newLink}"]`).first();
+        const link = page.locator(`[data-snaghunt-result="${newLink}"]`).first();
         const waiting = page.waitForEvent('download', { timeout: 15_000 }).catch(() => null);
         await link.click({ timeout: 5_000 }).catch(() => undefined);
         const download = (await waiting) ?? downloaded;
@@ -286,7 +286,7 @@ async function waitForOutcome(
         // A "Download" button that appeared after the tool ran: press it and catch the file.
         const index = newButton.slice(newButton.lastIndexOf('#') + 1);
         const waiting = page.waitForEvent('download', { timeout: 15_000 }).catch(() => null);
-        await page.locator(`[data-testcrew-result-button="${index}"]`).first().click({ timeout: 5_000 }).catch(() => undefined);
+        await page.locator(`[data-snaghunt-result-button="${index}"]`).first().click({ timeout: 5_000 }).catch(() => undefined);
         const download = (await waiting) ?? downloaded;
         if (download) return { kind: 'download', name: download.suggestedFilename(), bytes: await sizeOf(download) };
         return { kind: 'inline', what: `a "${label(newButton)}" button, which did not start a download` };
@@ -359,7 +359,7 @@ interface Attempt {
 
 /**
  * One go at a tool on `page`: choose the sample, start the tool, wait for the result.
- * Throws NotFoundError when there is nothing TestCrew can try.
+ * Throws NotFoundError when there is nothing Snaghunt can try.
  */
 async function attempt(page: Page, tool: ToolLink, open: (url: string) => Promise<void>, blockedCount: () => number): Promise<Attempt> {
   const stopWatching = watchPageErrors(page);
@@ -377,7 +377,7 @@ async function attempt(page: Page, tool: ToolLink, open: (url: string) => Promis
     if (ready.fileInputs.length) {
       const first = ready.fileInputs[0]!;
       const kind = chooseSample(tool.path, first.accept);
-      if (!kind) throw new NotFoundError(`TestCrew has no sample file this tool accepts (${first.accept || 'any file'}).`);
+      if (!kind) throw new NotFoundError(`Snaghunt has no sample file this tool accepts (${first.accept || 'any file'}).`);
       if (/^(audio|video)\//.test(kind.mimeType) && !(await hasWebAudio(page))) {
         // Playwright's WebKit build for Windows ships without Web Audio; real Safari has it.
         // A failure here would be our test browser's limit, not the site's bug.
@@ -391,7 +391,7 @@ async function attempt(page: Page, tool: ToolLink, open: (url: string) => Promis
       await page.locator('main input[type="file"], [role="main"] input[type="file"], article input[type="file"], input[type="file"]').first().setInputFiles(files);
       used = files.map((file) => `${file.name} (${file.buffer.length} bytes)`).join(', ');
     } else {
-      inputText = 'TestCrew sample text.\nSecond line, with numbers 1 2 3.';
+      inputText = 'Snaghunt sample text.\nSecond line, with numbers 1 2 3.';
       await page.locator('main textarea:visible, textarea:visible').first().fill(inputText);
       used = 'sample text';
     }
@@ -510,7 +510,7 @@ function primaryMessage(text: string): string {
     .trim();
 }
 
-/** "testcrew-sample.wav (32044 bytes), …" → "a sample WAV file". */
+/** "snaghunt-sample.wav (32044 bytes), …" → "a sample WAV file". */
 function fileInWords(used: string): string {
   if (used === 'sample text') return 'some sample text';
   const ext = /\.([a-z0-9]+)\s/i.exec(used)?.[1]?.toUpperCase();
@@ -603,7 +603,7 @@ async function useTool(ctx: JourneyContext, tool: ToolLink, session: ToolSession
   }
   if (result.outcome.kind === 'message') {
     // The tool explained why it would not take this sample. That is handled behaviour, not a bug.
-    throw new NotFoundError(`The tool did not accept TestCrew's ${used}${clicked}: "${result.outcome.text}"`);
+    throw new NotFoundError(`The tool did not accept Snaghunt's ${used}${clicked}: "${result.outcome.text}"`);
   }
   if (result.outcome.kind === 'none') {
     throw new NotFoundError(`Could not find the button that starts ${tool.path}, and nothing happened on its own.`);
@@ -642,7 +642,7 @@ async function wrongFile(ctx: JourneyContext, tool: ToolLink, accept: string): P
   try {
     const name = toolName((await page.locator('h1').first().innerText({ timeout: 2_000 }).catch(() => '')) || undefined, tool.path);
     const before = await snapshot(page);
-    const file: SampleFile = { name: 'testcrew-not-supported.txt', mimeType: 'text/plain', buffer: Buffer.from('This is a plain text file, not the kind of file this tool takes.\n') };
+    const file: SampleFile = { name: 'snaghunt-not-supported.txt', mimeType: 'text/plain', buffer: Buffer.from('This is a plain text file, not the kind of file this tool takes.\n') };
     await page.locator('input[type="file"]').first().setInputFiles(file);
     await page.waitForTimeout(800);
     const action = await findAction(page, tool.path, 3_000);

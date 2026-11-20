@@ -60,7 +60,7 @@ process.on('unhandledRejection', fail);
 const health = await call('GET', '/health');
 step(`API healthy: ${JSON.stringify(health.json)}`);
 
-const email = `smoke-${Date.now()}@testcrew.test`;
+const email = `smoke-${Date.now()}@snaghunt.test`;
 await call('POST', '/auth/register', { email, name: 'Smoke Test', password: `Smoke-${Date.now()}-pw` });
 step('Signed up a fresh account');
 

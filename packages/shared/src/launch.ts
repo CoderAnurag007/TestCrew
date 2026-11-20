@@ -197,10 +197,10 @@ export function ticketMarkdown(finding: TicketFinding, links: { report?: string 
   }
   const footer = [
     links.report ? `[Screenshots and evidence](${links.report})` : null,
-    links.app ? `[Open in TestCrew](${links.app})` : null,
+    links.app ? `[Open in Snaghunt](${links.app})` : null,
   ].filter(Boolean);
   if (footer.length) lines.push('', '---', `${footer.join(' · ')}`);
-  lines.push('', '_Found by TestCrew._');
+  lines.push('', '_Found by Snaghunt._');
   return lines.join('\n');
 }
 

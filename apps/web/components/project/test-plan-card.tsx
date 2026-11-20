@@ -42,7 +42,7 @@ const CATEGORY_OPTIONS: Array<{ value: AppCategory; label: string; description: 
   {
     value: 'auto',
     label: 'Auto-detect',
-    description: 'TestCrew picks a category from the pages it finds.',
+    description: 'Snaghunt picks a category from the pages it finds.',
   },
   {
     value: 'ecommerce',
@@ -663,8 +663,8 @@ export function TestPlanTab({ project }: { project: ProjectDetail }) {
               type="email"
               value={plan.testData.email}
               maxLength={160}
-              placeholder="testcrew+run@example.com"
-              hint="Leave empty to use testcrew+<run>@example.com, unique per run."
+              placeholder="snaghunt+run@example.com"
+              hint="Leave empty to use snaghunt+<run>@example.com, unique per run."
               onChange={(email) => setIn('testData', { email })}
             />
             <TextField

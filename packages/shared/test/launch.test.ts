@@ -53,6 +53,6 @@ describe('alerts and tickets', () => {
     expect(text).toContain('**Severity:** High');
     expect(text).toContain('1. Open the cart\n2. Click Pay');
     expect(text).toContain('### What actually happened\nNothing.');
-    expect(text).toContain('[Open in TestCrew](https://app/runs/1)');
+    expect(text).toContain('[Open in Snaghunt](https://app/runs/1)');
   });
 });

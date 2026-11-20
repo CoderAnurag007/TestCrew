@@ -173,11 +173,11 @@ export type AlertMessage = {
 };
 
 export function alertSubject(message: AlertMessage): string {
-  if (message.kind === 'failed') return `TestCrew: the audit of ${message.projectName} could not finish`;
+  if (message.kind === 'failed') return `Snaghunt: the audit of ${message.projectName} could not finish`;
   const fresh = message.findings.filter((item) => item.change === 'NEW').length;
   const back = message.findings.length - fresh;
   const parts = [fresh ? `${fresh} new ${fresh === 1 ? 'bug' : 'bugs'}` : null, back ? `${back} came back` : null].filter(Boolean);
-  return `TestCrew: ${parts.join(', ')} on ${message.projectName}`;
+  return `Snaghunt: ${parts.join(', ')} on ${message.projectName}`;
 }
 
 export function alertText(message: AlertMessage): string {
@@ -207,7 +207,7 @@ function escapeSlack(text: string): string {
 
 export function slackPayload(message: AlertMessage): Record<string, unknown> {
   const blocks: Record<string, unknown>[] = [
-    { type: 'header', text: { type: 'plain_text', text: alertSubject(message).replace(/^TestCrew: /, '').slice(0, 150) } },
+    { type: 'header', text: { type: 'plain_text', text: alertSubject(message).replace(/^Snaghunt: /, '').slice(0, 150) } },
     {
       type: 'context',
       elements: [
@@ -270,11 +270,11 @@ export function alertHtml(message: AlertMessage): string {
   return `<!doctype html><html><body style="margin:0;background:#f6f6f7;padding:24px">
 <table role="presentation" width="100%" style="max-width:600px;margin:0 auto;background:#fff;border:1px solid #e6e7ea;border-radius:10px;padding:24px">
 <tr><td>
-  <div style="font:600 18px/1.3 system-ui,sans-serif;color:#111">${esc(alertSubject(message).replace(/^TestCrew: /, ''))}</div>
+  <div style="font:600 18px/1.3 system-ui,sans-serif;color:#111">${esc(alertSubject(message).replace(/^Snaghunt: /, ''))}</div>
   <div style="font:13px/1.5 system-ui,sans-serif;color:#666;margin:4px 0 16px">${esc(message.siteUrl)}${message.score != null && message.kind === 'bugs' ? ` · Score ${Math.round(message.score)}/100` : ''}</div>
   <table role="presentation" width="100%">${message.kind === 'failed' ? `<tr><td>${rows}</td></tr>` : rows}</table>
   <a href="${esc(message.runUrl)}" style="display:inline-block;margin-top:16px;background:#111;color:#fff;text-decoration:none;font:600 14px system-ui,sans-serif;padding:10px 16px;border-radius:6px">Open the report</a>
-  <div style="font:12px/1.5 system-ui,sans-serif;color:#888;margin-top:20px">Sent by TestCrew because alerts are on for this project.</div>
+  <div style="font:12px/1.5 system-ui,sans-serif;color:#888;margin-top:20px">Sent by Snaghunt because alerts are on for this project.</div>
 </td></tr></table></body></html>`;
 }
 
@@ -420,7 +420,7 @@ export async function sendRunAlerts(
 async function postJson(send: Sender, url: string, body: unknown): Promise<void> {
   const response = await send(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'user-agent': 'TestCrew-Alerts/1.0' },
+    headers: { 'content-type': 'application/json', 'user-agent': 'Snaghunt-Alerts/1.0' },
     body: JSON.stringify(body),
     redirect: 'error',
     signal: AbortSignal.timeout(10_000),
@@ -435,7 +435,7 @@ async function sendEmail(to: string[], subject: string, text: string, html: stri
   const { createTransport } = await import('nodemailer');
   const transport = createTransport(smtp);
   await transport.sendMail({
-    from: process.env.ALERT_FROM ?? 'TestCrew <alerts@testcrew.local>',
+    from: process.env.ALERT_FROM ?? 'Snaghunt <alerts@snaghunt.local>',
     to: to.join(', '),
     subject,
     text,

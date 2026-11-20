@@ -1,4 +1,4 @@
-# TestCrew on one server (a VPS with Docker). Everything runs here:
+# Snaghunt on one server (a VPS with Docker). Everything runs here:
 # Postgres, Redis, the API, two workers, the website and Caddy for HTTPS.
 #
 #   cp infrastructure/deploy/.env.production.example infrastructure/deploy/.env.production
@@ -7,12 +7,12 @@
 #
 # Screenshots and reports go to a shared volume, or to S3/R2 when S3_* is set.
 
-name: testcrew
+name: snaghunt
 
 x-app-env: &app-env
   NODE_ENV: production
   LOG_LEVEL: ${LOG_LEVEL:-info}
-  DATABASE_URL: postgresql://${POSTGRES_USER:-testcrew}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-testcrew}
+  DATABASE_URL: postgresql://${POSTGRES_USER:-snaghunt}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-snaghunt}
   REDIS_URL: redis://redis:6379
   WEB_ORIGIN: https://${APP_DOMAIN:?set APP_DOMAIN}
   SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
@@ -33,13 +33,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-testcrew}
+      POSTGRES_USER: ${POSTGRES_USER:-snaghunt}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-testcrew}
+      POSTGRES_DB: ${POSTGRES_DB:-snaghunt}
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-testcrew}']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-snaghunt}']
       interval: 5s
       timeout: 5s
       retries: 20
@@ -63,7 +63,7 @@ services:
       dockerfile: infrastructure/docker/Dockerfile
       target: migrate
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-testcrew}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-testcrew}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-snaghunt}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-snaghunt}
     depends_on:
       postgres:
         condition: service_healthy

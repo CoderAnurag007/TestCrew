@@ -1,6 +1,6 @@
-# Deploying TestCrew
+# Deploying Snaghunt
 
-TestCrew runs as five pieces: **Postgres**, **Redis** (sessions + the audit queue),
+Snaghunt runs as five pieces: **Postgres**, **Redis** (sessions + the audit queue),
 the **API**, one or more **workers** (real browsers) and the **website**.
 All of them build from `infrastructure/docker/Dockerfile` (targets `api`, `worker`,
 `web`, `migrate`, `fixture`).
@@ -38,7 +38,7 @@ Database migrations run automatically (the `migrate` service) before the API sta
 
 - More audits at once: raise `WORKER_REPLICAS` (each worker ≈ 1.5 GB RAM, two audits).
 - Screenshots off the server disk: set the `S3_*` values (S3 or Cloudflare R2).
-- Backups: dump Postgres daily, e.g. `docker compose exec postgres pg_dump -U testcrew testcrew > backup.sql`.
+- Backups: dump Postgres daily, e.g. `docker compose exec postgres pg_dump -U snaghunt snaghunt > backup.sql`.
 
 ## Option B: a managed platform
 

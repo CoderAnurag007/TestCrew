@@ -83,7 +83,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Menu />
             </Button>
-            <Link href="/dashboard" className="rounded-lg lg:hidden" aria-label="TestCrew overview">
+            <Link href="/dashboard" className="rounded-lg lg:hidden" aria-label="Snaghunt overview">
               <BrandMark className="size-6" />
             </Link>
             <Breadcrumbs />

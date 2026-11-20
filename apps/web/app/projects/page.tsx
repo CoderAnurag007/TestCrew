@@ -60,7 +60,7 @@ export default function ProjectsPage() {
       <PageHeader
         eyebrow={currentOrg?.name ?? 'Projects'}
         title="Projects"
-        description="Each project is one web app TestCrew audits, with its own environments, credentials and safety rules."
+        description="Each project is one web app Snaghunt audits, with its own environments, credentials and safety rules."
         actions={
           <Button disabled={!currentOrg} onClick={() => setOpen(true)}>
             <Plus />
@@ -103,7 +103,7 @@ export default function ProjectsPage() {
         <EmptyState
           icon={FolderPlus}
           title="No projects yet"
-          description="Add the URL of an app you want audited. TestCrew starts in read-only mode, so nothing in your app changes."
+          description="Add the URL of an app you want audited. Snaghunt starts in read-only mode, so nothing in your app changes."
           action={
             <Button onClick={() => setOpen(true)}>
               <Plus />

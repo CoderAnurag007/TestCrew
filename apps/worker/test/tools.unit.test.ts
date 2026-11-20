@@ -86,7 +86,7 @@ describe('choosing a sample for a tool', () => {
     expect(chooseSample('/image/resize', 'image/*')?.ext).toBe('png');
     expect(chooseSample('/audio/trim', 'audio/*')?.ext).toBe('wav');
     expect(chooseSample('/pdf/excel-to-pdf', '.xlsx,.csv')?.ext).toBe('xlsx');
-    // Nothing TestCrew can make: no sample rather than a wrong one.
+    // Nothing Snaghunt can make: no sample rather than a wrong one.
     expect(chooseSample('/pdf/pptx-to-pdf', '.pptx')).toBeNull();
   });
 

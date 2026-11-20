@@ -1046,7 +1046,7 @@ export async function runPostExplorationPipeline(
           title: (explain?.title ?? `${journey.name}: check failed — ${lower(check.name)}`).slice(0, 240),
           description:
             explain?.summary ??
-            `While “${lower(step.goal)}”, TestCrew expected that ${lower(check.name)}${check.expected ? ` (${check.expected})` : ''}, but found ${check.actual ?? 'otherwise'}.`,
+            `While “${lower(step.goal)}”, Snaghunt expected that ${lower(check.name)}${check.expected ? ` (${check.expected})` : ''}, but found ${check.actual ?? 'otherwise'}.`,
           severity: money || toolBroken ? 'HIGH' : 'MEDIUM',
           category: 'BUG',
           confidence: 0.9,
@@ -1175,7 +1175,7 @@ export async function runPostExplorationPipeline(
   const breakdown = scoreBreakdown({ findings: visibleFindings, screensExplored: states.length });
   const score = breakdown.score;
 
-  const exportKey = `runs/${input.runId}/testcrew.spec.ts`;
+  const exportKey = `runs/${input.runId}/snaghunt.spec.ts`;
   try {
     const exportable = executions
       .filter((item) => item.result.status !== 'SKIPPED' || item.draft.mutates)

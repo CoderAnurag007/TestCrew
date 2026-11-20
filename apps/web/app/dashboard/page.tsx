@@ -164,7 +164,7 @@ export default function DashboardPage() {
               <EmptyState
                 icon={FolderPlus}
                 title="Create your first project"
-                description="Add the URL of a web app. TestCrew explores it, writes and runs tests, and reports what is broken."
+                description="Add the URL of a web app. Snaghunt explores it, writes and runs tests, and reports what is broken."
                 action={
                   <Button onClick={() => setProjectOpen(true)}>
                     <Plus />

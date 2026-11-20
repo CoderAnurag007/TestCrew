@@ -67,8 +67,8 @@ function verificationInstructions(baseUrl: string, token: string, verifiedHosts:
     verified,
     verifiedAt: null,
     dnsRecordName: verificationRecordName(parsed.hostname),
-    dnsRecordValue: `testcrew-verify=${token}`,
-    fileUrl: `${parsed.protocol}//${host}/.well-known/testcrew-verification.txt`,
+    dnsRecordValue: `snaghunt-verify=${token}`,
+    fileUrl: `${parsed.protocol}//${host}/.well-known/snaghunt-verification.txt`,
     fileContents: token,
   };
 }

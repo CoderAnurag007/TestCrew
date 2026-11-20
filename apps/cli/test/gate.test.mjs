@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateGate, markdownSummary, parseArgs } from '../testcrew.mjs';
+import { evaluateGate, markdownSummary, parseArgs } from '../snaghunt.mjs';
 
 const base = {
   status: 'COMPLETED',
@@ -48,7 +48,7 @@ describe('CI gate', () => {
   it('writes a readable markdown summary', () => {
     const gate = evaluateGate(base, parseArgs(['run', '--project', 'p']));
     const md = markdownSummary(base, gate, 'https://auditor/runs/1');
-    expect(md).toContain('TestCrew audit: failed');
+    expect(md).toContain('Snaghunt audit: failed');
     expect(md).toContain('1 new');
     expect(md).toContain('Checkout total wrong');
   });

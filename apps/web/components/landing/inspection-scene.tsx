@@ -140,7 +140,7 @@ export function InspectionScene({ className, compact = false }: { className?: st
       onPointerLeave={() => setTilt({ x: 0, y: 0 })}
     >
       <p className="sr-only">
-        An example audit of a store’s product page: TestCrew tries each control in turn. Choosing size 42 and Add to
+        An example audit of a store’s product page: Snaghunt tries each control in turn. Choosing size 42 and Add to
         cart work; applying the code SAVE10 has no effect, and one product image returns 404.
       </p>
       <div aria-hidden style={{ height: stageHeight, perspective: 1900 * scale }} className="relative">

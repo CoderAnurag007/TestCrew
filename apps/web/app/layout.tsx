@@ -24,7 +24,7 @@ const archivo = Archivo({
 });
 
 export const metadata: Metadata = {
-  title: { default: 'TestCrew · AI App Auditor', template: '%s · TestCrew' },
+  title: { default: 'Snaghunt · AI App Auditor', template: '%s · Snaghunt' },
   description: 'Autonomous quality audits for web applications: explores your app, writes and runs tests, and reports what is broken.',
 };
 

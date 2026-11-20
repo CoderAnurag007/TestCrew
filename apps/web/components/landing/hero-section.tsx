@@ -26,7 +26,7 @@ export function HeroSection({ primaryHref, primaryLabel, signedIn }: HeroSection
             <span className="block text-[#3a3e45]">Every bug on record.</span>
           </h1>
           <p className="mt-7 max-w-[44ch] text-[17px] leading-relaxed text-[var(--night-dim)]">
-            TestCrew works through your web app like a QA crew on the night shift. It tries every control, walks every
+            Snaghunt works through your web app like a QA crew on the night shift. It tries every control, walks every
             journey, and leaves you the evidence for each thing it finds.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">

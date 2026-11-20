@@ -185,7 +185,7 @@ function DetailsCard({ project }: { project: ProjectDetail }) {
   return (
     <SettingsSection
       title="Project details"
-      description="The name and address shown across TestCrew."
+      description="The name and address shown across Snaghunt."
     >
       <form
         className="grid gap-5 sm:grid-cols-2"

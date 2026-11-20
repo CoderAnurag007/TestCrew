@@ -133,11 +133,11 @@ export async function registerLaunchRoutes(app: FastifyInstance, send: Fetch = f
     });
     if (!row?.secretCiphertext) throw new HttpError(404, 'Save the webhook first');
     const target = await app.secrets.decrypt(row.secretCiphertext);
-    const text = `TestCrew is connected. Alerts for ${project.name} will arrive here.`;
+    const text = `Snaghunt is connected. Alerts for ${project.name} will arrive here.`;
     const body =
       params.provider === 'slack'
         ? { text, blocks: [{ type: 'section', text: { type: 'mrkdwn', text: `:white_check_mark: ${text}` } }] }
-        : { event: 'test', subject: 'TestCrew test alert', text, projectName: project.name };
+        : { event: 'test', subject: 'Snaghunt test alert', text, projectName: project.name };
     if (params.provider === 'webhook') {
       const { assertSafeNavigationTarget } = await import('@auditor/shared/ssrf');
       await assertSafeNavigationTarget(target, { allowPrivate: false }).catch((error: Error) => {
@@ -146,7 +146,7 @@ export async function registerLaunchRoutes(app: FastifyInstance, send: Fetch = f
     }
     const response = await send(target, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'user-agent': 'TestCrew-Alerts/1.0' },
+      headers: { 'content-type': 'application/json', 'user-agent': 'Snaghunt-Alerts/1.0' },
       body: JSON.stringify(body),
       redirect: 'error',
       signal: AbortSignal.timeout(10_000),
@@ -465,7 +465,7 @@ export async function createTicket(
         accept: 'application/vnd.github+json',
         'x-github-api-version': '2022-11-28',
         'content-type': 'application/json',
-        'user-agent': 'TestCrew',
+        'user-agent': 'Snaghunt',
       },
       body: JSON.stringify({ title, body, labels: Array.isArray(config.labels) ? config.labels : ['bug'] }),
     });

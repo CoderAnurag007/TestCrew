@@ -110,7 +110,7 @@ function MonitoringForm({ project, initial }: { project: ProjectDetail; initial:
     >
       <SettingsSection
         title="Scheduled audits"
-        description="TestCrew audits the site on its own and tells you only when something new breaks."
+        description="Snaghunt audits the site on its own and tells you only when something new breaks."
       >
         <div className="space-y-5">
           <div className="grid gap-2">

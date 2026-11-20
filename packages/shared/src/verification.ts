@@ -6,8 +6,8 @@ import { assertSafeNavigationTarget } from './ssrf.js';
  * before an audit may send mutating requests (FULL safety mode) to a public host.
  *
  * Either of these passes:
- *   - DNS TXT record on `_testcrew.<host>` containing `testcrew-verify=<token>`
- *   - `https://<host>/.well-known/testcrew-verification.txt` containing `<token>`
+ *   - DNS TXT record on `_snaghunt.<host>` containing `snaghunt-verify=<token>`
+ *   - `https://<host>/.well-known/snaghunt-verification.txt` containing `<token>`
  */
 export interface VerificationResult {
   verified: boolean;
@@ -16,8 +16,11 @@ export interface VerificationResult {
   detail: string;
 }
 
+/** The product's former name, for records created before the rename. */
+const LEGACY = 'testcrew';
+
 export function verificationRecordName(host: string): string {
-  return `_testcrew.${host.replace(/:\d+$/, '')}`;
+  return `_snaghunt.${host.replace(/:\d+$/, '')}`;
 }
 
 export async function verifyDomainOwnership(input: {
@@ -32,35 +35,48 @@ export async function verifyDomainOwnership(input: {
   const parsed = new URL(input.baseUrl);
   const host = parsed.host.toLowerCase();
   const hostname = parsed.hostname.toLowerCase();
-  const expected = `testcrew-verify=${input.token}`;
+  const expected = `snaghunt-verify=${input.token}`;
 
   const resolveTxt = input.resolveTxt ?? ((name: string) => dns.resolveTxt(name));
-  try {
-    const records = await resolveTxt(verificationRecordName(hostname));
-    if (records.some((chunks) => chunks.join('').trim() === expected)) {
-      return { verified: true, method: 'dns', host, detail: `TXT ${verificationRecordName(hostname)} matched` };
+  // The product was called TestCrew before; records set up under that name still count.
+  const dnsChecks = [
+    { name: verificationRecordName(hostname), value: expected },
+    { name: `_${LEGACY}.${hostname.replace(/:\d+$/, '')}`, value: `${LEGACY}-verify=${input.token}` },
+  ];
+  for (const check of dnsChecks) {
+    try {
+      const records = await resolveTxt(check.name);
+      if (records.some((chunks) => chunks.join('').trim() === check.value)) {
+        return { verified: true, method: 'dns', host, detail: `TXT ${check.name} matched` };
+      }
+    } catch {
+      /* try the next record, then HTTP */
     }
-  } catch {
-    /* fall through to HTTP */
   }
 
-  const fileUrl = `${parsed.protocol}//${host}/.well-known/testcrew-verification.txt`;
+  const fileUrl = `${parsed.protocol}//${host}/.well-known/snaghunt-verification.txt`;
+  const legacyUrl = `${parsed.protocol}//${host}/.well-known/${LEGACY}-verification.txt`;
   try {
     await assertSafeNavigationTarget(fileUrl, { allowPrivate: input.allowPrivate ?? false, resolver: input.resolveHost });
     const fetchImpl = input.fetchImpl ?? fetch;
-    const response = await fetchImpl(fileUrl, {
-      redirect: 'manual',
-      signal: AbortSignal.timeout(8_000),
-      headers: { 'user-agent': 'TestCrew-Verifier/1.0' },
-    });
-    if (response.ok) {
-      const body = (await response.text()).slice(0, 4096);
-      if (body.split(/\s+/).includes(input.token) || body.includes(expected)) {
-        return { verified: true, method: 'http', host, detail: `${fileUrl} matched` };
+    let lastDetail = '';
+    for (const url of [fileUrl, legacyUrl]) {
+      const response = await fetchImpl(url, {
+        redirect: 'manual',
+        signal: AbortSignal.timeout(8_000),
+        headers: { 'user-agent': 'Snaghunt-Verifier/1.0' },
+      });
+      if (response.ok) {
+        const body = (await response.text()).slice(0, 4096);
+        if (body.split(/\s+/).includes(input.token) || body.includes(expected) || body.includes(`${LEGACY}-verify=${input.token}`)) {
+          return { verified: true, method: 'http', host, detail: `${url} matched` };
+        }
+        lastDetail = `${url} did not contain the token`;
+      } else if (!lastDetail) {
+        lastDetail = `${url} returned HTTP ${response.status}`;
       }
-      return { verified: false, host, detail: `${fileUrl} did not contain the token` };
     }
-    return { verified: false, host, detail: `${fileUrl} returned HTTP ${response.status}` };
+    return { verified: false, host, detail: lastDetail };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'request failed';
     return { verified: false, host, detail: `No DNS record and ${fileUrl} failed: ${message}` };

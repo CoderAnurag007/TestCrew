@@ -469,13 +469,13 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
       assertTokenScope(request, run.projectId, 'Run not found');
       let body: Buffer;
       try {
-        body = await app.storage.get(`runs/${run.id}/testcrew.spec.ts`);
+        body = await app.storage.get(`runs/${run.id}/snaghunt.spec.ts`);
       } catch {
         throw new HttpError(404, run.status === 'COMPLETED' ? 'This run has no exported tests' : 'Tests are exported when the run completes');
       }
       return reply
         .header('content-type', 'text/plain; charset=utf-8')
-        .header('content-disposition', `attachment; filename="testcrew-${run.id}.spec.ts"`)
+        .header('content-disposition', `attachment; filename="snaghunt-${run.id}.spec.ts"`)
         .send(body);
     },
   );
@@ -545,7 +545,7 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
       return reply
         .header('content-type', 'text/html; charset=utf-8')
         .header('content-security-policy', "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:")
-        .header('content-disposition', `${download ? 'attachment' : 'inline'}; filename="testcrew-report-${run.id}.html"`)
+        .header('content-disposition', `${download ? 'attachment' : 'inline'}; filename="snaghunt-report-${run.id}.html"`)
         .send(body);
     },
   );

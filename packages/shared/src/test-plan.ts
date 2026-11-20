@@ -162,9 +162,9 @@ export const testPlanSchema = z
         cardNumber: z.string().max(23).default(''),
         expiry: z.string().max(7).default('12/34'),
         cvc: z.string().max(4).default('123'),
-        nameOnCard: z.string().max(80).default('TestCrew QA'),
+        nameOnCard: z.string().max(80).default('Snaghunt QA'),
       })
-      .default({ mode: 'never', provider: 'stripe', cardNumber: '', expiry: '12/34', cvc: '123', nameOnCard: 'TestCrew QA' }),
+      .default({ mode: 'never', provider: 'stripe', cardNumber: '', expiry: '12/34', cvc: '123', nameOnCard: 'Snaghunt QA' }),
     testData: testDataSchema.default(testDataSchema.parse({})),
     controlHints: z.array(controlHintSchema).max(50).default([]),
     customJourneys: z.array(customJourneySchema).max(30).default([]),

@@ -66,8 +66,8 @@ describe('project v2 settings', () => {
     expect(first.json()).toMatchObject({
       host: 'example.com',
       verified: false,
-      dnsRecordName: '_testcrew.example.com',
-      fileUrl: 'https://example.com/.well-known/testcrew-verification.txt',
+      dnsRecordName: '_snaghunt.example.com',
+      fileUrl: 'https://example.com/.well-known/snaghunt-verification.txt',
     });
     const second = await injectJson('POST', `/projects/${project.id}/verification`, { cookie: user.cookie });
     expect(second.json().token).toBe(first.json().token);

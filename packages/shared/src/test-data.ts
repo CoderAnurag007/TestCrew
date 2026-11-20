@@ -124,7 +124,7 @@ export function valueFor(field: FieldDescriptor, options: TestDataOptions = {}):
     case 'secret':
       return null;
     case 'email':
-      value = `testcrew+${token}@example.com`;
+      value = `snaghunt+${token}@example.com`;
       break;
     case 'phone':
       value = '5550100123';
@@ -174,7 +174,7 @@ export function valueFor(field: FieldDescriptor, options: TestDataOptions = {}):
       value = `Ada Tester ${token}`;
       break;
     case 'company':
-      value = `TestCrew ${token}`;
+      value = `Snaghunt ${token}`;
       break;
     case 'street':
       value = '221 Test Street';
@@ -189,7 +189,7 @@ export function valueFor(field: FieldDescriptor, options: TestDataOptions = {}):
       value = 'United States';
       break;
     case 'username':
-      value = `testcrew_${token}`;
+      value = `snaghunt_${token}`;
       break;
     case 'message':
       value = `Automated QA check ${token}. Please ignore.`;

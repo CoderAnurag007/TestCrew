@@ -99,9 +99,9 @@ const CONTROLS_SCRIPT = `(scopeSelector) => {
   return out;
 }`;
 
-/** Marks the element matching key/occurrence (inside scope) with data-testcrew-probe and reports whether it exists. */
+/** Marks the element matching key/occurrence (inside scope) with data-snaghunt-probe and reports whether it exists. */
 const MARK_SCRIPT = `([scopeSelector, key, occurrence]) => {
-  document.querySelectorAll('[data-testcrew-probe]').forEach((el) => el.removeAttribute('data-testcrew-probe'));
+  document.querySelectorAll('[data-snaghunt-probe]').forEach((el) => el.removeAttribute('data-snaghunt-probe'));
   const scope = scopeSelector ? document.querySelector(scopeSelector) : document;
   if (!scope) return false;
   const selector = 'a[href], button, [role="button"], [role="tab"], [role="menuitem"], [role="link"], [role="switch"], [role="checkbox"], [role="option"], summary, select, input[type="checkbox"], input[type="radio"], input[type="submit"], input[type="button"]';
@@ -132,7 +132,7 @@ const MARK_SCRIPT = `([scopeSelector, key, occurrence]) => {
     const k = [tag, el.getAttribute('role') || '', nameOf(el), tag === 'a' ? el.getAttribute('href') || '' : '', el.getAttribute('type') || ''].join('|');
     if (k !== key) continue;
     if (seen === occurrence) {
-      el.setAttribute('data-testcrew-probe', '1');
+      el.setAttribute('data-snaghunt-probe', '1');
       return true;
     }
     seen += 1;
@@ -172,9 +172,9 @@ const OVERLAYS_SCRIPT = `() => {
     const style = getComputedStyle(el);
     if ((style.position === 'fixed' || style.position === 'absolute') && Number(style.zIndex) >= 10) consider(el);
   }
-  document.querySelectorAll('[data-testcrew-overlay]').forEach((el) => el.removeAttribute('data-testcrew-overlay'));
+  document.querySelectorAll('[data-snaghunt-overlay]').forEach((el) => el.removeAttribute('data-snaghunt-overlay'));
   return out.map((item, index) => {
-    item.el.setAttribute('data-testcrew-overlay', String(index));
+    item.el.setAttribute('data-snaghunt-overlay', String(index));
     return { signature: item.signature, title: item.title, kind: item.kind, area: item.area };
   });
 }`;
@@ -189,7 +189,7 @@ const STATE_SCRIPT = `() => {
   let focused = null;
   if (active && active !== document.body) {
     const tag = active.tagName.toLowerCase();
-    if (active.hasAttribute('data-testcrew-probe')) focused = 'probe:';
+    if (active.hasAttribute('data-snaghunt-probe')) focused = 'probe:';
     else if (tag === 'textarea' || active.isContentEditable || (tag === 'input' && !['button', 'submit', 'checkbox', 'radio', 'hidden'].includes(active.type))) {
       const name = active.getAttribute('aria-label') || active.getAttribute('placeholder') || active.getAttribute('name') || tag;
       focused = 'the "' + String(name).slice(0, 40) + '" field';
@@ -202,7 +202,7 @@ const STATE_SCRIPT = `() => {
   const attrs = (el) => el ? [el.className && typeof el.className === 'string' ? el.className : '', el.getAttribute('data-theme') || '', el.getAttribute('data-mode') || '', el.getAttribute('data-color-scheme') || '', el.style.colorScheme || ''].join('|') : '';
   const look = [attrs(root), attrs(body), body ? getComputedStyle(body).backgroundColor : '', body ? getComputedStyle(body).color : ''].join('#');
   // Toggle state of the control being probed (switches, pressed buttons, tabs).
-  const probe = document.querySelector('[data-testcrew-probe="1"]');
+  const probe = document.querySelector('[data-snaghunt-probe="1"]');
   const toggled = probe ? [probe.getAttribute('aria-pressed'), probe.getAttribute('aria-checked'), probe.getAttribute('aria-selected'), probe.getAttribute('data-state')].join('|') : '';
   return { url: location.href, text, mainLength: ((main && main.innerText) || '').length, expanded, controls, scrollY: Math.round(scrollY), focused, look, toggled };
 }`;
@@ -444,7 +444,7 @@ async function rejectCookieBanner(page: Page): Promise<void> {
 
 async function markControl(page: Page, scope: string | null, control: RawControl): Promise<Locator | null> {
   const found = (await page.evaluate(`(${MARK_SCRIPT})(${JSON.stringify([scope, control.key, control.occurrence])})`)) as boolean;
-  return found ? page.locator('[data-testcrew-probe="1"]').first() : null;
+  return found ? page.locator('[data-snaghunt-probe="1"]').first() : null;
 }
 
 async function overlays(page: Page): Promise<RawOverlay[]> {
@@ -596,7 +596,7 @@ async function probeControl(worker: Worker, item: WorkItem, input: InteractionMa
     }
     // After a reload or re-render the marked element is gone; never wait for it
     // (Playwright would wait its full default timeout for each check).
-    const marked = page.locator('[data-testcrew-probe="1"]').first();
+    const marked = page.locator('[data-snaghunt-probe="1"]').first();
     const stillMarked = (await marked.count().catch(() => 0)) > 0;
     const expandedAfter = stillMarked ? await marked.getAttribute('aria-expanded', { timeout: 1_000 }).catch(() => null) : null;
     if ((expandedBefore === 'false' && expandedAfter === 'true') || after.expanded > before.expanded || after.controls > before.controls + 2) {
@@ -835,7 +835,7 @@ async function exploreOverlay(
 async function scopeFor(page: Page, signature: string): Promise<string | null> {
   const list = await overlays(page);
   const index = list.findIndex((candidate) => candidate.signature === signature);
-  return index >= 0 ? `[data-testcrew-overlay="${index}"]` : null;
+  return index >= 0 ? `[data-snaghunt-overlay="${index}"]` : null;
 }
 
 function skipped(control: RawControl, detail: string): ControlProbe {

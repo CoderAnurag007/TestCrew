@@ -49,7 +49,7 @@ export function TestsList({ testCases, testRuns, live }: { testCases: TestCase[]
       <EmptyState
         icon={FlaskConical}
         title={live ? 'Tests are written after exploring' : 'No tests were generated'}
-        description="TestCrew turns the flows it discovers, and your intents, into Playwright tests and runs them."
+        description="Snaghunt turns the flows it discovers, and your intents, into Playwright tests and runs them."
       />
     );
   }

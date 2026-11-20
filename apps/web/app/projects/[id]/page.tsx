@@ -117,7 +117,7 @@ export default function ProjectDetailPage() {
                 <EmptyState
                   icon={Radar}
                   title="No audits yet"
-                  description="Start an audit and TestCrew will explore the app, write tests, run them and report what it finds."
+                  description="Start an audit and Snaghunt will explore the app, write tests, run them and report what it finds."
                   action={<StartAuditButton projectId={projectId} project={project.data} />}
                   className="border-0"
                 />

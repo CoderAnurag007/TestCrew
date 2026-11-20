@@ -48,7 +48,7 @@ export function Brand({
       <Link href={href} className={cn('inline-flex items-center gap-2.5 outline-none', className)}>
         <NightMark />
         <span className="font-display text-[15px] font-extrabold uppercase tracking-[0.06em] text-[var(--night-ink)] [font-stretch:125%]">
-          TestCrew
+          Snaghunt
         </span>
       </Link>
     );
@@ -63,7 +63,7 @@ export function Brand({
     >
       <BrandMark />
       <span className="flex flex-col leading-none">
-        <span className="text-[15px] font-semibold tracking-[-0.01em] text-ink">TestCrew</span>
+        <span className="text-[15px] font-semibold tracking-[-0.01em] text-ink">Snaghunt</span>
         {subtitle ? <span className="mt-1 text-[12px] text-muted-foreground">{subtitle}</span> : null}
       </span>
     </Link>

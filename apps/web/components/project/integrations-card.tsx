@@ -38,7 +38,7 @@ const PROVIDERS: Record<
     blurb: 'One click turns a finding into an issue with steps and a fix hint.',
     fields: [
       { key: 'repo', label: 'Repository', placeholder: 'your-org/your-repo' },
-      { key: 'labels', label: 'Labels', placeholder: 'bug, testcrew', hint: 'Comma separated.' },
+      { key: 'labels', label: 'Labels', placeholder: 'bug, snaghunt', hint: 'Comma separated.' },
     ],
     secretLabel: 'Access token',
     secretHint: 'A fine-grained token with “Issues: read and write” on this repository.',
@@ -289,7 +289,7 @@ function BrandingSection({ organizationId }: { organizationId: string }) {
   return (
     <SettingsSection
       title="Shared report branding"
-      description="Shared report links show your name, logo and colour instead of TestCrew’s. Applies to every project in this workspace."
+      description="Shared report links show your name, logo and colour instead of Snaghunt’s. Applies to every project in this workspace."
     >
       {org.data ? (
         <form

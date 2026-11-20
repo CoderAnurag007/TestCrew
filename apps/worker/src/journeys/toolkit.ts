@@ -71,7 +71,7 @@ const ROLE_PATTERNS: Record<ControlRole, { text: RegExp; attr?: RegExp; href?: R
 const CANDIDATES_SCRIPT = `(scope) => {
   const root = scope ? document.querySelector(scope) : document;
   if (!root) return [];
-  document.querySelectorAll('[data-testcrew-target]').forEach((el) => el.removeAttribute('data-testcrew-target'));
+  document.querySelectorAll('[data-snaghunt-target]').forEach((el) => el.removeAttribute('data-snaghunt-target'));
   const out = [];
   let index = 0;
   for (const el of root.querySelectorAll('a[href], button, input, select, textarea, [role="button"], [role="link"], [role="menuitem"], [role="tab"], [role="option"], [role="searchbox"], [role="combobox"], summary, label')) {
@@ -92,7 +92,7 @@ const CANDIDATES_SCRIPT = `(scope) => {
       if (img) text = img.getAttribute('alt') || '';
     }
     const attrs = [el.id, el.getAttribute('name'), typeof el.className === 'string' ? el.className : '', el.getAttribute('data-testid'), el.getAttribute('data-action'), el.getAttribute('autocomplete'), el.getAttribute('type'), el.getAttribute('placeholder')].filter(Boolean).join(' ');
-    el.setAttribute('data-testcrew-target', String(index));
+    el.setAttribute('data-snaghunt-target', String(index));
     out.push({ index, tag, type: (el.getAttribute('type') || '').toLowerCase(), text: text.slice(0, 120), attrs: attrs.slice(0, 300), href: tag === 'a' ? el.getAttribute('href') : null, y: r.top + scrollY });
     index += 1;
   }
@@ -243,7 +243,7 @@ export class JourneyContext {
     }
     if (!best) return null;
     return {
-      locator: this.page.locator(`[data-testcrew-target="${best.candidate.index}"]`).first(),
+      locator: this.page.locator(`[data-snaghunt-target="${best.candidate.index}"]`).first(),
       label: best.candidate.text || best.candidate.attrs.slice(0, 40),
       href: best.candidate.href,
       tag: best.candidate.tag,
@@ -357,13 +357,13 @@ export class JourneyContext {
     const kind = classifyField(descriptor);
     const hay = `${field.name ?? ''} ${field.label} ${field.placeholder ?? ''} ${field.autocomplete ?? ''}`.toLowerCase();
     if (kind === 'payment' || kind === 'secret') return null;
-    if (kind === 'email') return data.email || `testcrew+${this.token}@example.com`;
+    if (kind === 'email') return data.email || `snaghunt+${this.token}@example.com`;
     if (kind === 'phone') return data.phone;
     if (kind === 'postal') return data.postalCode;
     if (kind === 'firstName') return data.firstName;
     if (kind === 'lastName') return data.lastName;
     if (kind === 'fullName') return `${data.firstName} ${data.lastName}`;
-    if (kind === 'company') return data.company || `TestCrew ${this.token}`;
+    if (kind === 'company') return data.company || `Snaghunt ${this.token}`;
     if (kind === 'street') return /line ?2|address ?2|apartment|suite|apt/.test(hay) ? data.address2 || 'Suite 1' : data.address1;
     if (kind === 'city') return data.city;
     if (kind === 'state') return data.state;

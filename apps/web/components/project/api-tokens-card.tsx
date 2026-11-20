@@ -54,7 +54,7 @@ export function ApiTokensCard({ projectId }: { projectId: string }) {
           <>
             Tokens let CI start runs and read results for this project only. Use them with the{' '}
             <code className="mono rounded-[4px] bg-well px-1 py-0.5 text-xs text-ink">
-              testcrew
+              snaghunt
             </code>{' '}
             CLI.
           </>

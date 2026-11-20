@@ -7,8 +7,8 @@ import { useEffect, useRef } from 'react';
  * the target page is already mounted, or navigates there with a query flag the
  * page reads once on mount.
  */
-export const NEW_PROJECT_EVENT = 'testcrew:new-project';
-export const NEW_WORKSPACE_EVENT = 'testcrew:new-workspace';
+export const NEW_PROJECT_EVENT = 'snaghunt:new-project';
+export const NEW_WORKSPACE_EVENT = 'snaghunt:new-workspace';
 
 export const NEW_PROJECT_FLAG = 'new';
 export const NEW_WORKSPACE_FLAG = 'workspace';

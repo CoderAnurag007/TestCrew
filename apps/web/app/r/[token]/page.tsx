@@ -152,7 +152,7 @@ function Report({ token, data }: { token: string; data: PublicReport }) {
 
         <footer className="mt-14 border-t border-border pt-6 text-[13px] text-muted-foreground">
           {data.brand.footer ? <p className="text-ink">{data.brand.footer}</p> : null}
-          <p className="mt-1">Tested with real browsers by TestCrew. Every finding includes the steps to reproduce it.</p>
+          <p className="mt-1">Tested with real browsers by Snaghunt. Every finding includes the steps to reproduce it.</p>
         </footer>
       </main>
     </div>

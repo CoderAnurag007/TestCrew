@@ -688,7 +688,7 @@ const saas: JourneyDefinition[] = [
     category: 'saas',
     requires: 'full',
     run: async (ctx) => {
-      const name = `TestCrew ${ctx.token}`;
+      const name = `Snaghunt ${ctx.token}`;
       let listUrl = '';
       await ctx.step('Create a record', async () => {
         ctx.requireFull();

@@ -44,7 +44,7 @@ export const BENCHMARK_PLAN: TestPlan = testPlanSchema.parse({
   disabledJourneys: ['search_product'],
   interactionMap: { enabled: true, maxControlsPerScreen: 40, maxScreens: 25, budgetMinutes: 5, excludeLabels: [] },
   transactions: { enabled: true, maxPerRun: 2, stopBefore: 'none' },
-  payment: { mode: 'sandbox', provider: 'stripe', cardNumber: '4242424242424242', expiry: '12/34', cvc: '123', nameOnCard: 'TestCrew QA' },
+  payment: { mode: 'sandbox', provider: 'stripe', cardNumber: '4242424242424242', expiry: '12/34', cvc: '123', nameOnCard: 'Snaghunt QA' },
 });
 
 export interface BenchmarkResult {

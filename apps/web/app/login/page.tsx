@@ -40,7 +40,7 @@ export default function LoginPage() {
       description="Pick up where your last audit left off."
       footer={
         <>
-          New to TestCrew?{' '}
+          New to Snaghunt?{' '}
           <Link className="font-medium text-cobalt underline-offset-4 hover:underline" href="/register">
             Create an account
           </Link>

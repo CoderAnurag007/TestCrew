@@ -1,0 +1,40 @@
+# Example: audit each pull request's preview deployment with Snaghunt.
+# Copy to .github/workflows/snaghunt-audit.yml in the repository you want audited.
+#
+# Repository secrets/variables:
+#   SNAGHUNT_API_URL    URL of your Snaghunt API, e.g. https://auditor.example.com/api
+#   SNAGHUNT_TOKEN      Project API token (Project settings -> CI tokens)
+#   SNAGHUNT_PROJECT    Project id in Snaghunt
+name: Snaghunt audit
+
+on:
+  deployment_status:
+
+jobs:
+  audit:
+    # Run once the preview deployment for the PR is live.
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Download the Snaghunt CLI
+        run: curl -fsSL "${{ vars.SNAGHUNT_CLI_URL }}" -o snaghunt.mjs
+      - name: Audit the preview deployment
+        env:
+          SNAGHUNT_API_URL: ${{ vars.SNAGHUNT_API_URL }}
+          SNAGHUNT_TOKEN: ${{ secrets.SNAGHUNT_TOKEN }}
+        run: >
+          node snaghunt.mjs run
+          --project "${{ vars.SNAGHUNT_PROJECT }}"
+          --base-url "${{ github.event.deployment_status.environment_url }}"
+          --fail-on new-high
+          --export snaghunt.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: snaghunt-playwright-tests
+          path: snaghunt.spec.ts
+          if-no-files-found: ignore

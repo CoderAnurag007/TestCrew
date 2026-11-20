@@ -34,7 +34,7 @@ describe('field-aware test data', () => {
 
   it('mixes the token into free text so created records can be found again', () => {
     expect(valueFor({ label: 'Full name' }, { token: 'abc123' })).toContain('abc123');
-    expect(valueFor({ inputType: 'email' }, { token: 'abc123' })).toBe('testcrew+abc123@example.com');
+    expect(valueFor({ inputType: 'email' }, { token: 'abc123' })).toBe('snaghunt+abc123@example.com');
   });
 
   it('applies overrides by name or label', () => {
@@ -47,7 +47,7 @@ describe('domain ownership verification', () => {
     const result = await verifyDomainOwnership({
       baseUrl: 'https://shop.example.com',
       token: 'tok123',
-      resolveTxt: async (name) => (name === '_testcrew.shop.example.com' ? [['testcrew-verify=tok123']] : []),
+      resolveTxt: async (name) => (name === '_snaghunt.shop.example.com' ? [['snaghunt-verify=tok123']] : []),
       fetchImpl: (async () => new Response('', { status: 404 })) as typeof fetch,
     });
     expect(result).toMatchObject({ verified: true, method: 'dns' });

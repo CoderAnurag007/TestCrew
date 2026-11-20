@@ -90,7 +90,7 @@ function resolveValue(ctx: JourneyContext, value: string): string {
   const data = ctx.plan.testData as unknown as Record<string, unknown>;
   return value.replace(/\{\{\s*(\w+)\s*\}\}/g, (whole, key: string) => {
     if (key === 'token') return ctx.token;
-    if (key === 'email') return (data.email as string) || `testcrew+${ctx.token}@example.com`;
+    if (key === 'email') return (data.email as string) || `snaghunt+${ctx.token}@example.com`;
     const found = data[key];
     return typeof found === 'string' ? found : whole;
   });

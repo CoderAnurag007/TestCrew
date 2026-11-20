@@ -74,7 +74,7 @@ export function CreateProjectDialog({
         <DialogHeader>
           <DialogTitle>New project</DialogTitle>
           <DialogDescription>
-            Point TestCrew at an app. You can add credentials, more environments and safety rules
+            Point Snaghunt at an app. You can add credentials, more environments and safety rules
             later.
           </DialogDescription>
         </DialogHeader>
