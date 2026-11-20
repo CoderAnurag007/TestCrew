@@ -152,6 +152,20 @@ export default function RunDetailPage() {
         </div>
       ) : null}
 
+      {live && openFindings.length > 0 && tab !== 'findings' ? (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+          <p className="text-sm text-ink">
+            <span className="font-medium">
+              {openFindings.length} snag{openFindings.length === 1 ? '' : 's'} found so far.
+            </span>{' '}
+            <span className="text-muted-foreground">The full audit is still running and may find more.</span>
+          </p>
+          <Button size="sm" variant="outline" onClick={() => setChosenTab('findings')}>
+            See them now
+          </Button>
+        </div>
+      ) : null}
+
       {data || !run.isError ? (
         <Tabs value={tab} onValueChange={setChosenTab}>
           <TabsList className="w-full justify-start sm:w-auto">

@@ -15,6 +15,7 @@ import {
   runWithDevice,
 } from '@auditor/browser';
 import { orgUsage } from './plan-usage.js';
+import { runQuickScan } from './quick-scan.js';
 import { asStringArray, callResetHook, resolveSafetyMode } from './safety-mode.js';
 import type { Prisma, PrismaClient, SecretStore } from '@auditor/database';
 import {
@@ -459,6 +460,26 @@ async function executeAuditRunOnDevice(
         });
       }
     }
+    // A fast first look so the first snags show up within minutes; the full audit follows.
+    if (!run.replayOfRunId) {
+      livePhase = 'quick scan';
+      await runQuickScan(deps, {
+        runId: run.id,
+        organizationId: run.organizationId,
+        projectId: run.projectId,
+        page,
+        manager,
+        targetUrl,
+        device: run.device,
+        policy: {
+          mode: safety.mode,
+          allowPrivate: run.project.allowPrivateTargets,
+          targetOrigin: new URL(targetUrl).origin,
+          blockedPathPatterns: asStringArray(run.project.blockedPathPatterns),
+        },
+      }).catch((error) => deps.logger.warn({ runId: run.id, err: error }, 'quick scan failed; continuing with the full audit'));
+    }
+
     const recorder = new RecordingExplorer(deps.explorer, replay);
     const activeGuard = guard;
     livePhase = 'exploring';

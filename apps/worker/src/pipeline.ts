@@ -23,6 +23,7 @@ import {
   type ReportPayload,
 } from '@auditor/analyzer';
 import { currentDeviceProfile, LiveStreamer, type BlockedRequest } from '@auditor/browser';
+import { reconcileQuickFindings } from './quick-scan.js';
 import type { Prisma } from '@auditor/database';
 import {
   catalogFromActions,
@@ -1331,6 +1332,11 @@ export async function runPostExplorationPipeline(
       payload: payload as unknown as Prisma.InputJsonValue,
     },
   });
+
+  // Quick-scan snags that the full audit found again are folded into the full findings.
+  await reconcileQuickFindings(deps, input.runId).catch((error) =>
+    deps.logger.warn({ runId: input.runId, err: error }, 'could not merge quick scan findings'),
+  );
 
   try {
     await buildHtmlReport(deps, input.runId);
