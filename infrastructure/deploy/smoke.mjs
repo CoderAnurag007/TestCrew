@@ -79,6 +79,15 @@ const project = await call('POST', '/projects', {
 });
 step(`Created project ${project.json.id} for ${TARGET}`);
 
+// The test shop asks visitors to sign in; these are its public demo login (apps/fixture).
+await call('POST', `/projects/${project.json.id}/credentials`, {
+  name: 'Test shop login',
+  type: 'USERNAME_PASSWORD',
+  username: process.env.TARGET_USERNAME ?? 'demo',
+  secret: process.env.TARGET_PASSWORD ?? 'demo-password',
+});
+step('Saved the test shop login');
+
 const run = await call('POST', `/projects/${project.json.id}/runs`, {});
 step(`Queued audit ${run.json.id}`);
 
@@ -92,6 +101,9 @@ for (;;) {
     step(`  status ${detail.status}${detail.currentAction ? ` (${detail.currentAction})` : ''}`);
   }
   if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(detail.status)) break;
+  if (detail.currentAction === 'authentication-required' && Date.now() - started > 60_000) {
+    throw new Error('The audit is waiting for a login it cannot do (authentication-required)');
+  }
   if (Date.now() - started > TIMEOUT_MS) throw new Error(`Audit still ${detail.status} after ${TIMEOUT_MS / 60000} min`);
   await new Promise((resolve) => setTimeout(resolve, 5000));
 }
