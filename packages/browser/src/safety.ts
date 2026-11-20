@@ -92,6 +92,16 @@ const TELEMETRY_HOSTS = [
   'pinterest.com',
 ];
 
+/**
+ * True for errors raised by third-party analytics rather than the app itself,
+ * e.g. Safari's "Fetch API cannot load https://x.clarity.ms/collect due to access
+ * control checks". The site's own code did nothing wrong, so these are not findings.
+ */
+export function isThirdPartyTrackerError(message: string): boolean {
+  const text = message.toLowerCase();
+  return TELEMETRY_HOSTS.some((host) => text.includes(host));
+}
+
 export function isTelemetryRequest(url: URL, resourceType?: string): boolean {
   if (resourceType === 'ping' || resourceType === 'beacon') return true;
   const host = url.hostname.toLowerCase();

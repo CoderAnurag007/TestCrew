@@ -1,4 +1,4 @@
-import { BrowserManager, detectBotCheck, installSafetyGuard, LiveStreamer, waitForSpaSettle, type SafetyGuard } from '@auditor/browser';
+import { BrowserManager, detectBotCheck, installSafetyGuard, isThirdPartyTrackerError, LiveStreamer, waitForSpaSettle, type SafetyGuard } from '@auditor/browser';
 import type {
   ControlOutcome,
   ControlProbe,
@@ -396,7 +396,9 @@ async function openWorker(manager: BrowserManager, input: InteractionMapInput): 
   page.on('request', (request) => {
     if (request.isNavigationRequest() && request.frame() === page.mainFrame()) worker.documentLoads += 1;
   });
-  page.on('pageerror', (error) => worker.pageErrors.push(error.message.slice(0, 300)));
+  page.on('pageerror', (error) => {
+    if (!isThirdPartyTrackerError(error.message)) worker.pageErrors.push(error.message.slice(0, 300));
+  });
   page.on('download', (download) => worker.downloads.push(download));
   context.on('page', (popup) => {
     if (popup !== page) worker.popups.push(popup);

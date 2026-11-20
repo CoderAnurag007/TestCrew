@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { stat } from 'node:fs/promises';
-import { deviceContextOptions, installSafetyGuard } from '@auditor/browser';
+import { deviceContextOptions, installSafetyGuard, isThirdPartyTrackerError } from '@auditor/browser';
 import type { Download, Locator, Page } from 'playwright';
 import type { JourneyDefinition, SharedState } from './packs.js';
 import {
@@ -328,9 +328,19 @@ async function waitForOutcome(
   }
 }
 
+async function hasWebAudio(page: Page): Promise<boolean> {
+  return page
+    .evaluate(() => 'AudioContext' in window || 'webkitAudioContext' in window)
+    .catch(() => true);
+}
+
 function watchPageErrors(page: Page): () => string[] {
   const errors: string[] = [];
-  const listener = (error: Error) => errors.push(error.message.split('\n')[0]?.slice(0, 200) ?? 'error');
+  const listener = (error: Error) => {
+    // Analytics scripts failing (common in Safari) are not the tool's fault.
+    if (isThirdPartyTrackerError(error.message)) return;
+    errors.push(error.message.split('\n')[0]?.slice(0, 200) ?? 'error');
+  };
   page.on('pageerror', listener);
   return () => {
     page.off('pageerror', listener);
@@ -368,6 +378,13 @@ async function attempt(page: Page, tool: ToolLink, open: (url: string) => Promis
       const first = ready.fileInputs[0]!;
       const kind = chooseSample(tool.path, first.accept);
       if (!kind) throw new NotFoundError(`TestCrew has no sample file this tool accepts (${first.accept || 'any file'}).`);
+      if (/^(audio|video)\//.test(kind.mimeType) && !(await hasWebAudio(page))) {
+        // Playwright's WebKit build for Windows ships without Web Audio; real Safari has it.
+        // A failure here would be our test browser's limit, not the site's bug.
+        throw new NotFoundError(
+          'Not checked in this browser: the Safari test browser on this machine has no Web Audio, which real Safari has. Check audio and video tools in Chrome or on a real iPhone.',
+        );
+      }
       const wantsSeveral = first.multiple && /merge|combine|join|zip|collage|batch/i.test(tool.path);
       const files = await makeFiles(page, kind, wantsSeveral ? 2 : 1);
       if (!files) throw new NotFoundError(`The audit browser could not make a .${kind.ext} sample for this tool.`);

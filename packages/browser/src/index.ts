@@ -15,6 +15,7 @@ export {
   SafetyGuard,
   installSafetyGuard,
   isTelemetryRequest,
+  isThirdPartyTrackerError,
   globToRegExp,
   DEFAULT_BLOCKED_PATH_PATTERNS,
   type SafetyMode,

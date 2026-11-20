@@ -148,3 +148,13 @@ describe('analytics beacons in read-only mode', () => {
     expect(await guard().decide(post('https://shop.example.com/cart/add'))).toMatch(/Read-only/);
   });
 });
+
+describe('third-party tracker errors', () => {
+  it('ignores analytics failures but keeps real app errors', async () => {
+    const { isThirdPartyTrackerError } = await import('../src/safety.js');
+    expect(isThirdPartyTrackerError('Fetch API cannot load https://e.clarity.ms/collect due to access control checks.')).toBe(true);
+    expect(isThirdPartyTrackerError('/q.clarity.ms/collect due to access control checks')).toBe(true);
+    expect(isThirdPartyTrackerError('Unknown operation: run')).toBe(false);
+    expect(isThirdPartyTrackerError('TypeError: undefined is not an object (evaluating "a.b")')).toBe(false);
+  });
+});

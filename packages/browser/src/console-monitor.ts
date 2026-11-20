@@ -1,3 +1,4 @@
+import { isThirdPartyTrackerError } from './safety.js';
 import type { Page } from 'playwright';
 
 export interface ConsoleMessageRecord {
@@ -28,6 +29,7 @@ export class ConsoleMonitor {
       });
     });
     page.on('pageerror', (error) => {
+      if (isThirdPartyTrackerError(error.message)) return;
       this.messages.push({
         // Uncaught exceptions are kept apart from console.error noise; only these count as page errors.
         type: 'pageerror',

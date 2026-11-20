@@ -452,7 +452,11 @@ export async function createTicket(
   };
 
   if (provider === 'github') {
-    const repo = String(config.repo ?? '');
+    const repo = String(config.repo ?? '')
+      .trim()
+      .replace(/^https?:\/\/github\.com\//i, '')
+      .replace(/\.git$/i, '')
+      .replace(/\/+$/, '');
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new HttpError(400, 'Set the GitHub repository first');
     const json = await call(`https://api.github.com/repos/${repo}/issues`, {
       method: 'POST',

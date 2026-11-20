@@ -221,6 +221,12 @@ describe('ticket creation', () => {
     await expect(createTicket(bad.send, 'linear', { teamId: 't1' }, 'key', finding, {})).rejects.toThrow(/Team not found/);
   });
 
+  it('drops a pasted .git ending from the GitHub repository', async () => {
+    const { send, calls } = fakeFetch({ html_url: 'https://github.com/acme/shop/issues/8' });
+    await createTicket(send, 'github', { repo: 'acme/shop.git' }, 'tok', finding, {});
+    expect(calls[0]!.url).toBe('https://api.github.com/repos/acme/shop/issues');
+  });
+
   it('explains a refusal from the tracker', async () => {
     const { send } = fakeFetch({ message: 'Bad credentials' }, 401);
     await expect(createTicket(send, 'github', { repo: 'acme/shop' }, 'tok', finding, {})).rejects.toThrow(

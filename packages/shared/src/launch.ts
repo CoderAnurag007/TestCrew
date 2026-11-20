@@ -102,7 +102,12 @@ export const integrationBodySchema = z.discriminatedUnion('provider', [
   z.object({
     provider: z.literal('github'),
     config: z.object({
-      repo: z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'Use owner/repository'),
+      repo: z
+        .string()
+        .trim()
+        // Accept pasted forms like https://github.com/owner/repo.git and keep "owner/repo".
+        .transform((value) => value.replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '').replace(/\/+$/, ''))
+        .pipe(z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'Use owner/repository')),
       labels: z.array(z.string().min(1).max(50)).max(10).default(['bug']),
     }),
     secret: z.string().min(10).max(500).optional(),
