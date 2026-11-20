@@ -46,7 +46,14 @@ jobs:
 
       - name: Logs on failure
         if: failure()
-        run: docker compose -f infrastructure/deploy/docker-compose.smoke.yml logs --tail 200 api worker migrate fixture
+        run: |
+          docker compose -f infrastructure/deploy/docker-compose.smoke.yml logs --no-color --tail 200 api worker migrate fixture
+          # Also as annotations, which can be read without signing in to GitHub.
+          for svc in worker api; do
+            text=$(docker compose -f infrastructure/deploy/docker-compose.smoke.yml logs --no-color --no-log-prefix --tail 80 $svc | grep -vE '"level":30' | tail -c 7000)
+            text="${text//'%'/'%25'}"; text="${text//$'\r'/}"; text="${text//$'\n'/'%0A'}"
+            echo "::error title=$svc logs::$text"
+          done
 
       - name: Stop
         if: always()

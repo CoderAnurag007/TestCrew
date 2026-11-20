@@ -36,9 +36,26 @@ async function call(method, path, body) {
   return { json, response };
 }
 
+const progress = [];
 function step(message) {
+  progress.push(message);
   console.log(`• ${message}`);
 }
+
+// In GitHub Actions, failures also become annotations, which are readable without signing in.
+const annotate = (level, title, text) => {
+  if (!process.env.GITHUB_ACTIONS) return;
+  const body = text.replace(/%/g, '%25').replace(/\r/g, '').replace(/\n/g, '%0A');
+  console.log(`::${level} title=${title}::${body}`);
+};
+const fail = (error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  annotate('error', 'Smoke test failed', `${message}\n\nProgress:\n${progress.join('\n')}`);
+  console.error(error);
+  process.exit(1);
+};
+process.on('uncaughtException', fail);
+process.on('unhandledRejection', fail);
 
 const health = await call('GET', '/health');
 step(`API healthy: ${JSON.stringify(health.json)}`);
@@ -95,4 +112,5 @@ cookie = '';
 const report = await call('GET', `/public/reports/${share.json.token}`);
 step(`Public report link works without signing in (${report.json.findings.length} findings)`);
 
+annotate('notice', 'Smoke test passed', progress.join('\n'));
 console.log('\nSMOKE TEST PASSED');
