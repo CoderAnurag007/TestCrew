@@ -265,6 +265,7 @@ function ExplorationCard({ project }: { project: ProjectDetail }) {
             allowDestructive: data.get('allowDestructive') === 'on',
             allowPrivateTargets: data.get('allowPrivateTargets') === 'on',
             recordVideo: data.get('recordVideo') === 'on',
+            designReview: data.get('designReview') === 'on',
           });
         }}
       >
@@ -317,6 +318,12 @@ function ExplorationCard({ project }: { project: ProjectDetail }) {
             title="Record video per test"
             description="Useful for debugging. Uses more storage."
             defaultChecked={project.recordVideo}
+          />
+          <ToggleRow
+            name="designReview"
+            title="Include a design review"
+            description="Every audit, scheduled ones too, also reviews layout, readability, phone view and accessibility from screenshots. Adds about 3 minutes."
+            defaultChecked={Boolean(project.designReview)}
           />
         </div>
         <SaveButton pending={update.isPending}>Save exploration settings</SaveButton>

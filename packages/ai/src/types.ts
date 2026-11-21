@@ -31,6 +31,12 @@ export interface ImageAnalysisRequest {
   prompt: string;
   imageBase64: string;
   mimeType?: string;
+  /** More screenshots sent after the first one, in order. */
+  extraImages?: Array<{ imageBase64: string; mimeType?: string }>;
+  /** Ask for a JSON answer. */
+  json?: boolean;
+  maxTokens?: number;
+  timeoutMs?: number;
   model?: string;
 }
 

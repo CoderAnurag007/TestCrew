@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -19,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -94,14 +96,17 @@ export function useStartAudit(projectId: string, project: ProjectDetail | undefi
   const queryClient = useQueryClient();
   const router = useRouter();
   return useMutation({
-    mutationFn: (choice?: { environmentId?: string; device?: Device }) =>
+    mutationFn: (choice?: { environmentId?: string; device?: Device; bugAudit?: boolean; designReview?: boolean }) =>
       runApi.create(projectId, {
         environmentId: choice?.environmentId ?? defaultEnvironment(project)?.id,
         device: choice?.device,
+        bugAudit: choice?.bugAudit,
+        designReview: choice?.designReview,
       }),
     onSuccess: async (run) => {
       await queryClient.invalidateQueries({ queryKey: ['runs', projectId] });
-      toast.success('Audit queued');
+      await queryClient.invalidateQueries({ queryKey: ['onboarding'] });
+      toast.success(run.bugAudit === false ? 'Design review queued' : 'Audit queued');
       router.push(`/runs/${run.id}`);
     },
     onError: (error) => {
@@ -126,7 +131,11 @@ export function StartAuditButton({
   const start = useStartAudit(projectId, project);
   const environments = project?.environments ?? [];
   const fallback = defaultEnvironment(project);
-  const label = start.isPending ? 'Starting…' : 'Start audit';
+  // What this audit checks; starts from the project's setting until changed here.
+  const [chosenChecks, setChecks] = useState<{ bugs: boolean; design: boolean } | null>(null);
+  const checks = chosenChecks ?? { bugs: true, design: Boolean(project?.designReview) };
+  const what = { bugAudit: checks.bugs, designReview: checks.design };
+  const label = start.isPending ? 'Starting…' : checks.bugs ? 'Start audit' : 'Start design review';
   const icon = start.isPending ? <Loader2 className="animate-spin" /> : <Play />;
 
   return (
@@ -134,9 +143,13 @@ export function StartAuditButton({
       <Button
         size={size}
         className="rounded-r-none"
-        onClick={() => start.mutate({ environmentId: fallback?.id })}
+        onClick={() => start.mutate({ environmentId: fallback?.id, ...what })}
         disabled={start.isPending || !project}
-        title={fallback ? `Audit ${fallback.name} on desktop Chrome` : undefined}
+        title={
+          fallback
+            ? `${checks.bugs ? `Audit ${fallback.name}${checks.design ? ' with a design review' : ''}` : `Design review of ${fallback.name}`} on desktop Chrome`
+            : undefined
+        }
       >
         {icon}
         {label}
@@ -154,11 +167,29 @@ export function StartAuditButton({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" sideOffset={6} className="w-[min(20rem,calc(100vw-2rem))]">
-          <DropdownMenuLabel>Audit {fallback ? fallback.name : 'the site'} as</DropdownMenuLabel>
+          <DropdownMenuLabel>Check for</DropdownMenuLabel>
+          <DropdownMenuCheckboxItem
+            checked={checks.bugs}
+            disabled={checks.bugs && !checks.design}
+            onCheckedChange={(value) => setChecks({ ...checks, bugs: Boolean(value) })}
+          >
+            <span className="block font-medium text-ink">Bugs and broken flows</span>
+            <span className="block text-[12px] text-muted-foreground">Clicks through every page, button and form · 15–25 min</span>
+          </DropdownMenuCheckboxItem>
+          <DropdownMenuCheckboxItem
+            checked={checks.design}
+            disabled={checks.design && !checks.bugs}
+            onCheckedChange={(value) => setChecks({ ...checks, design: Boolean(value) })}
+          >
+            <span className="block font-medium text-ink">Design review</span>
+            <span className="block text-[12px] text-muted-foreground">Layout, readability, phone and accessibility from screenshots · 2–4 min</span>
+          </DropdownMenuCheckboxItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>{checks.bugs ? 'Audit' : 'Review'} {fallback ? fallback.name : 'the site'} as</DropdownMenuLabel>
           {(Object.keys(DEVICES) as Device[]).map((device) => (
             <DropdownMenuItem
               key={device}
-              onSelect={() => start.mutate({ environmentId: fallback?.id, device })}
+              onSelect={() => start.mutate({ environmentId: fallback?.id, device, ...what })}
               className="flex-col items-stretch gap-0.5 px-2 py-1.5"
             >
               <span className="font-medium text-ink">{DEVICES[device].label}</span>
@@ -174,7 +205,7 @@ export function StartAuditButton({
             return (
               <DropdownMenuItem
                 key={environment.id}
-                onSelect={() => start.mutate({ environmentId: environment.id })}
+                onSelect={() => start.mutate({ environmentId: environment.id, ...what })}
                 className="flex-col items-stretch gap-1 px-2 py-2"
               >
                 <span className="flex min-w-0 items-center gap-2">

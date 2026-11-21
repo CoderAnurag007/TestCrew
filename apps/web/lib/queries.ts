@@ -75,6 +75,7 @@ export const projectApi = {
         | 'allowDestructive'
         | 'allowPrivateTargets'
         | 'recordVideo'
+        | 'designReview'
         | 'safetyMode'
         | 'resetHookUrl'
         | 'intents'
@@ -267,7 +268,15 @@ export const runApi = {
   get: (runId: string) => api<RunDetail>(`/runs/${runId}`),
   create: (
     projectId: string,
-    payload?: { environmentId?: string; replayOfRunId?: string; baseUrl?: string; trigger?: 'manual'; device?: Device },
+    payload?: {
+      environmentId?: string;
+      replayOfRunId?: string;
+      baseUrl?: string;
+      trigger?: 'manual';
+      device?: Device;
+      bugAudit?: boolean;
+      designReview?: boolean;
+    },
   ) =>
     api<Run>(`/projects/${projectId}/runs`, {
       method: 'POST',
@@ -417,4 +426,16 @@ export const planApi = {
   /** Only available outside production, until checkout is connected. */
   setPlan: (organizationId: string, plan: PlanId) =>
     api<UsageView>(`/organizations/${organizationId}/plan`, { method: 'POST', body: JSON.stringify({ plan }) }),
+};
+
+export type Onboarding = {
+  project: { id: string; name: string } | null;
+  firstRun: { id: string; status: string } | null;
+  firstReport: { id: string; findings: number } | null;
+  monitoring: boolean;
+  connected: boolean;
+};
+
+export const onboardingApi = {
+  get: (organizationId: string) => api<Onboarding>(`/organizations/${organizationId}/onboarding`),
 };

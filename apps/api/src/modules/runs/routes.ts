@@ -179,6 +179,9 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
           replayOfRunId: body.replayOfRunId ?? null,
           trigger: body.trigger ?? (request.apiToken ? 'ci' : 'manual'),
           device: body.device ?? 'desktop',
+          bugAudit: body.bugAudit ?? true,
+          // Without a choice, the project's setting decides; a design-only run always has one.
+          designReview: body.designReview ?? (body.bugAudit === false ? true : project.designReview),
         },
       });
 

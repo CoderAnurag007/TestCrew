@@ -36,6 +36,41 @@ export function DropdownMenuItem({
   );
 }
 
+/** A menu row with a tick box; the menu stays open so several can be changed. */
+export function DropdownMenuCheckboxItem({
+  className,
+  children,
+  checked,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.CheckboxItem>) {
+  return (
+    <DropdownMenuPrimitive.CheckboxItem
+      checked={checked}
+      onSelect={(event) => event.preventDefault()}
+      className={cn(
+        'flex cursor-pointer items-start gap-2.5 rounded-[4px] px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-well data-[disabled]:cursor-not-allowed data-[disabled]:opacity-60',
+        className,
+      )}
+      {...props}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-[4px] border',
+          checked ? 'border-ink bg-ink text-white' : 'border-[#c4c7cc] bg-card',
+        )}
+      >
+        <DropdownMenuPrimitive.ItemIndicator>
+          <svg viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M2.5 6.5l2.2 2.2 4.8-5" />
+          </svg>
+        </DropdownMenuPrimitive.ItemIndicator>
+      </span>
+      <span className="min-w-0 flex-1">{children}</span>
+    </DropdownMenuPrimitive.CheckboxItem>
+  );
+}
+
 export function DropdownMenuLabel({
   className,
   ...props

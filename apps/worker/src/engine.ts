@@ -12,10 +12,12 @@ import {
   LiveStreamer,
   type LiveAction,
   type SafetyGuard,
+  type SafetyPolicy,
   runWithDevice,
 } from '@auditor/browser';
 import { orgUsage } from './plan-usage.js';
 import { runQuickScan } from './quick-scan.js';
+import { runDesignReview } from './design-review.js';
 import { asStringArray, callResetHook, resolveSafetyMode } from './safety-mode.js';
 import type { Prisma, PrismaClient, SecretStore } from '@auditor/database';
 import {
@@ -460,8 +462,14 @@ async function executeAuditRunOnDevice(
         });
       }
     }
+    const policy: SafetyPolicy = {
+      mode: safety.mode,
+      allowPrivate: run.project.allowPrivateTargets,
+      targetOrigin: new URL(targetUrl).origin,
+      blockedPathPatterns: asStringArray(run.project.blockedPathPatterns),
+    };
     // A fast first look so the first snags show up within minutes; the full audit follows.
-    if (!run.replayOfRunId) {
+    if (!run.replayOfRunId && run.bugAudit) {
       livePhase = 'quick scan';
       await runQuickScan(deps, {
         runId: run.id,
@@ -471,13 +479,46 @@ async function executeAuditRunOnDevice(
         manager,
         targetUrl,
         device: run.device,
-        policy: {
-          mode: safety.mode,
-          allowPrivate: run.project.allowPrivateTargets,
-          targetOrigin: new URL(targetUrl).origin,
-          blockedPathPatterns: asStringArray(run.project.blockedPathPatterns),
-        },
+        policy,
+        // The design review checks the phone layout more thoroughly.
+        phoneCheck: !run.designReview,
       }).catch((error) => deps.logger.warn({ runId: run.id, err: error }, 'quick scan failed; continuing with the full audit'));
+    }
+
+    if (run.designReview) {
+      livePhase = 'design review';
+      await startStage(deps.prisma, { organizationId: run.organizationId, runId: run.id, name: 'design' });
+      const review = await runDesignReview(deps, {
+        runId: run.id,
+        organizationId: run.organizationId,
+        projectId: run.projectId,
+        page,
+        manager,
+        targetUrl,
+        policy,
+        storageState,
+        live,
+      }).catch(async (error) => {
+        deps.logger.warn({ runId: run.id, err: error }, 'design review failed');
+        await appendEvent(deps.prisma, {
+          organizationId: run.organizationId,
+          runId: run.id,
+          kind: 'warning',
+          message: `Design review could not finish: ${error instanceof Error ? error.message.split(/\r?\n/)[0] : 'unknown error'}`,
+        }).catch(() => undefined);
+        return null;
+      });
+      await completeStage(deps.prisma, {
+        organizationId: run.organizationId,
+        runId: run.id,
+        name: 'design',
+        ...(review ? {} : { status: 'FAILED' as const, error: 'Design review did not finish' }),
+      });
+      if (!run.bugAudit) {
+        await finishDesignOnlyRun(deps, run, review);
+        return;
+      }
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => undefined);
     }
 
     const recorder = new RecordingExplorer(deps.explorer, replay);
@@ -554,6 +595,42 @@ async function executeAuditRunOnDevice(
     await context?.close().catch(() => undefined);
     await manager.close().catch(() => undefined);
   }
+}
+
+/** A design-only run ends after the design review: no crawl, no tests. */
+async function finishDesignOnlyRun(
+  deps: AuditDependencies,
+  run: { id: string; organizationId: string; startedAt: Date | null; createdAt: Date },
+  review: { score: number; issues: number } | null,
+): Promise<void> {
+  if (!review) {
+    await setRunStatus(deps.prisma, run.id, 'FAILED', {
+      errorMessage: 'The design review could not open any page of the site.',
+      currentAction: null,
+      completedAt: new Date(),
+    });
+    return;
+  }
+  const usages = await deps.prisma.aiUsage.findMany({ where: { runId: run.id }, select: { estimatedCostUsd: true } });
+  const storage = await deps.prisma.evidence.aggregate({ where: { runId: run.id }, _sum: { byteLength: true } });
+  const startedAt = run.startedAt ?? run.createdAt;
+  await deps.prisma.run.updateMany({
+    where: { id: run.id, status: { not: 'CANCELLED' } },
+    data: {
+      status: 'COMPLETED',
+      aiCostUsd: usages.reduce((sum, item) => sum + item.estimatedCostUsd, 0),
+      browserDurationMs: Date.now() - startedAt.getTime(),
+      storageBytesEstimate: storage._sum.byteLength ?? 0,
+      currentAction: null,
+      completedAt: new Date(),
+    },
+  });
+  await appendEvent(deps.prisma, {
+    organizationId: run.organizationId,
+    runId: run.id,
+    kind: 'stage',
+    message: `Design review complete. Design score ${review.score}/100 with ${review.issues} thing${review.issues === 1 ? '' : 's'} to improve.`,
+  });
 }
 
 async function discoverAndExplore(

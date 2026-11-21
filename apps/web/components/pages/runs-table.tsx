@@ -98,6 +98,9 @@ export function RunsTable({
                 <div className="mt-0.5 flex min-w-0 gap-x-3 text-xs text-muted-foreground">
                   {showProject ? <span className="mono truncate">{shortId(run.id)}</span> : null}
                   <span className="truncate">{run.trigger ?? 'manual'}</span>
+                  {run.designReview ? (
+                    <span className="truncate">{run.bugAudit === false ? 'Design review' : '+ design review'}</span>
+                  ) : null}
                   {run.effectiveSafetyMode ? (
                     <span className="truncate">
                       {run.effectiveSafetyMode === 'FULL' ? 'Full' : 'Read-only'}
@@ -107,20 +110,21 @@ export function RunsTable({
               </div>
               <div className="flex items-center gap-3 justify-self-end md:justify-self-start">
                 <RunStatusDot status={run.status} />
-                <ScorePill score={run.qualityScore} className="md:hidden" />
+                <ScorePill score={run.bugAudit === false ? run.designScore : run.qualityScore} className="md:hidden" />
               </div>
               <div className="hidden md:block">
-                <ScorePill score={run.qualityScore} />
+                <ScorePill score={run.bugAudit === false ? run.designScore : run.qualityScore} />
               </div>
               <div className="col-span-2 flex flex-wrap gap-x-3 text-xs text-muted-foreground md:col-span-1">
-                <span>{run.pagesDiscovered} pages</span>
+                {run.bugAudit !== false ? <span>{run.pagesDiscovered} pages</span> : null}
+                {typeof run.designScore === 'number' ? <span className="tabular">Design {Math.round(run.designScore)}/100</span> : null}
                 {typeof run.testsGenerated === 'number' && run.testsGenerated > 0 ? (
                   <span className="tabular">
                     {run.testsPassed ?? 0}/{run.testsGenerated} tests passed
                   </span>
-                ) : (
+                ) : run.bugAudit !== false ? (
                   <span>{run.actionsExecuted} actions</span>
-                )}
+                ) : null}
                 <span className="md:hidden">{timeAgo(run.createdAt)}</span>
               </div>
               <div

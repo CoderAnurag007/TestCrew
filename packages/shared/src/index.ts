@@ -8,3 +8,4 @@ export * from './test-data.js';
 export * from './test-plan.js';
 export * from './launch.js';
 export * from './plans.js';
+export * from './design.js';

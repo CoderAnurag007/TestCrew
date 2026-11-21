@@ -1071,13 +1071,15 @@ export async function runPostExplorationPipeline(
   const suppressions = await deps.prisma.findingSuppression.findMany({ where: { projectId: input.projectId } });
   const suppressed = new Set(suppressions.map((item) => item.signature));
   const previousRun = await deps.prisma.run.findFirst({
-    where: { projectId: input.projectId, status: 'COMPLETED', id: { not: input.runId }, createdAt: { lt: run.createdAt } },
+    // Compare with the last audit that looked for bugs (a design-only review has none).
+    where: { projectId: input.projectId, status: 'COMPLETED', bugAudit: true, id: { not: input.runId }, createdAt: { lt: run.createdAt } },
     orderBy: { createdAt: 'desc' },
     select: { id: true },
   });
   const previousFindings = previousRun
     ? await deps.prisma.finding.findMany({
-        where: { runId: previousRun.id, suppressed: false },
+        // Design review findings are compared by the design review itself.
+        where: { runId: previousRun.id, suppressed: false, OR: [{ signature: null }, { NOT: { signature: { startsWith: 'design|' } } }] },
         select: { signature: true, title: true, severity: true, category: true, url: true },
       })
     : [];

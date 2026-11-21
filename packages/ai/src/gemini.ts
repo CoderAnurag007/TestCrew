@@ -135,12 +135,16 @@ export class GeminiProvider implements AIProvider {
                 data: request.imageBase64,
               },
             },
+            ...(request.extraImages ?? []).map((image) => ({
+              inlineData: { mimeType: image.mimeType ?? 'image/png', data: image.imageBase64 },
+            })),
           ],
         },
       ],
-      json: false,
+      json: request.json ?? false,
       temperature: 0,
-      maxTokens: 800,
+      maxTokens: request.maxTokens ?? 800,
+      timeoutMs: request.timeoutMs,
     });
   }
 

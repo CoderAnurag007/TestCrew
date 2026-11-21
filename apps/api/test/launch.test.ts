@@ -244,3 +244,48 @@ describe('ticket creation', () => {
     expect(list.content[0]!.content[0]!.content[1]!.marks).toEqual([{ type: 'link', attrs: { href: 'https://x.co/cart' } }]);
   });
 });
+
+describe('getting started progress', () => {
+  it('tracks site, first audit, first report and alerts', async () => {
+    const { user, org, project } = await setup();
+    const before = await injectJson('GET', `/organizations/${org.id}/onboarding`, { cookie: user.cookie });
+    expect(before.json()).toMatchObject({ project: { id: project.id }, firstRun: null, firstReport: null, monitoring: false, connected: false });
+
+    await completedRunWithFinding(project.id, org.id, user.body.id);
+    await injectJson('PUT', `/projects/${project.id}/monitoring`, { cookie: user.cookie, payload: { cadence: 'daily' } });
+    const after = (await injectJson('GET', `/organizations/${org.id}/onboarding`, { cookie: user.cookie })).json();
+    expect(after.firstRun).toMatchObject({ status: 'COMPLETED' });
+    expect(after.firstReport.findings).toBe(1);
+    expect(after.monitoring).toBe(true);
+    await injectJson('PUT', `/projects/${project.id}/monitoring`, { cookie: user.cookie, payload: { cadence: null } });
+  });
+});
+
+describe('design review option', () => {
+  it('runs a design review only when asked, or by the project setting', async () => {
+    const { user, project } = await setup();
+    const plain = await injectJson('POST', `/projects/${project.id}/runs`, { cookie: user.cookie, payload: {} });
+    expect(plain.statusCode).toBe(201);
+    expect(plain.json()).toMatchObject({ bugAudit: true, designReview: false });
+
+    const both = await injectJson('POST', `/projects/${project.id}/runs`, { cookie: user.cookie, payload: { designReview: true } });
+    expect(both.json()).toMatchObject({ bugAudit: true, designReview: true });
+
+    const designOnly = await injectJson('POST', `/projects/${project.id}/runs`, { cookie: user.cookie, payload: { bugAudit: false } });
+    expect(designOnly.json()).toMatchObject({ bugAudit: false, designReview: true });
+
+    const nothing = await injectJson('POST', `/projects/${project.id}/runs`, {
+      cookie: user.cookie,
+      payload: { bugAudit: false, designReview: false },
+    });
+    expect(nothing.statusCode).toBe(400);
+
+    const saved = await injectJson('PATCH', `/projects/${project.id}`, { cookie: user.cookie, payload: { designReview: true } });
+    expect(saved.json().designReview).toBe(true);
+    const byDefault = await injectJson('POST', `/projects/${project.id}/runs`, { cookie: user.cookie, payload: {} });
+    expect(byDefault.json()).toMatchObject({ designReview: true });
+
+    // Keep the local worker from picking these up.
+    await (await getApp()).prisma.run.updateMany({ where: { projectId: project.id }, data: { status: 'CANCELLED' } });
+  });
+});

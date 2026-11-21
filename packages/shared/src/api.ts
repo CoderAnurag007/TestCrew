@@ -87,6 +87,8 @@ export const createProjectBodySchema = z.object({
   allowDestructive: z.boolean().optional(),
   allowPrivateTargets: z.boolean().optional(),
   recordVideo: z.boolean().optional(),
+  /** Include a design review (layout, readability, phone, accessibility) in every audit, scheduled ones too. */
+  designReview: z.boolean().optional(),
   safetyMode: safetyModeSchema.optional(),
   resetHookUrl: url.nullable().optional(),
   intents: intentListSchema.optional(),
@@ -109,6 +111,8 @@ export const updateProjectBodySchema = z.object({
   allowDestructive: z.boolean().optional(),
   allowPrivateTargets: z.boolean().optional(),
   recordVideo: z.boolean().optional(),
+  /** Include a design review (layout, readability, phone, accessibility) in every audit, scheduled ones too. */
+  designReview: z.boolean().optional(),
   safetyMode: safetyModeSchema.optional(),
   resetHookUrl: url.nullable().optional(),
   intents: intentListSchema.optional(),
@@ -190,6 +194,12 @@ export const createRunBodySchema = z.object({
   trigger: z.enum(['manual', 'ci', 'schedule', 'api']).optional(),
   /** Browser and screen to audit with; defaults to desktop Chrome. */
   device: z.enum(['desktop', 'phone', 'safari', 'iphone']).optional(),
+  /** Look for bugs and broken flows (the full audit). Defaults to true. */
+  bugAudit: z.boolean().optional(),
+  /** Review the design from screenshots. Defaults to the project's setting. */
+  designReview: z.boolean().optional(),
+}).refine((body) => body.bugAudit !== false || body.designReview !== false, {
+  message: 'Choose at least one thing to check',
 });
 export type CreateRunBody = z.infer<typeof createRunBodySchema>;
 

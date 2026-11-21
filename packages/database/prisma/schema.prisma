@@ -215,6 +215,7 @@ model Project {
   allowDestructive     Boolean  @default(false)
   allowPrivateTargets  Boolean  @default(false)
   recordVideo          Boolean  @default(false)
+  designReview         Boolean  @default(false)
   safetyMode           SafetyMode @default(READ_ONLY)
   verificationToken    String?
   verifiedHost         String?
@@ -238,7 +239,8 @@ model Project {
   suppressions FindingSuppression[]
   testHistory  TestHistory[]
   apiTokens    ApiToken[]
-  environments Environment[]
+  environments Environment[]
+
   integrations ProjectIntegration[]
   credentials  Credential[]
   runs         Run[]
@@ -321,6 +323,10 @@ model Run {
   previousRunId         String?
   trigger               String    @default("manual")
   device                String    @default("desktop")
+  bugAudit              Boolean   @default(true)
+  designReview          Boolean   @default(false)
+  designScore           Float?
+  designReport          Json?
   shareToken            String?   @unique
   sharedAt              DateTime?
   alertsSentAt          DateTime?
@@ -349,7 +355,8 @@ model Run {
 
   @@index([organizationId])
   @@index([projectId, createdAt])
-  @@index([status])
+  @@index([status])
+
   @@index([status, createdAt])
 }
 

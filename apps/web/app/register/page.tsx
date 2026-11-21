@@ -41,7 +41,7 @@ export default function RegisterPage() {
   return (
     <AuthLayout
       title="Create your account"
-      description="Set up an account, then create a workspace and your first project."
+      description="Set up an account, then add your website and start your first audit."
       footer={
         <>
           Already have an account?{' '}

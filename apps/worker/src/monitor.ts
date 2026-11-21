@@ -57,6 +57,7 @@ export async function startDueMonitors(
       monitorEnvironmentId: true,
       monitorDevices: true,
       nextMonitorAt: true,
+      designReview: true,
     },
     take: 50,
   });
@@ -122,6 +123,7 @@ export async function startDueMonitors(
           createdById: owner.userId,
           trigger: 'schedule',
           device,
+          designReview: project.designReview,
         },
       });
       await deps.prisma.runEvent.create({

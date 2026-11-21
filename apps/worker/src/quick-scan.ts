@@ -40,7 +40,7 @@ type PageCheck = {
   brokenImages: string[];
 };
 
-function pathOf(url: string): string {
+export function pathOf(url: string): string {
   try {
     const parsed = new URL(url);
     return `${parsed.pathname}${parsed.search}` || '/';
@@ -81,7 +81,7 @@ async function checkPage(page: Page, url: string): Promise<PageCheck> {
   return { status, loadMs, errors, brokenImages };
 }
 
-async function mainLinks(page: Page, origin: string): Promise<string[]> {
+export async function mainLinks(page: Page, origin: string): Promise<string[]> {
   const hrefs = (await page
     // Written without named helpers: tsx renames them, and the renamed code
     // fails inside the page ("__name is not defined").
@@ -220,6 +220,8 @@ export async function runQuickScan(
     targetUrl: string;
     device: string;
     policy: SafetyPolicy;
+    /** Also check the home page at phone width (default true). */
+    phoneCheck?: boolean;
   },
 ): Promise<number> {
   const started = Date.now();
@@ -251,7 +253,7 @@ export async function runQuickScan(
   }
 
   // Desktop audits also get a look at phone width; phone audits already are one.
-  if (input.device === 'desktop' || input.device === 'safari') {
+  if (input.phoneCheck !== false && (input.device === 'desktop' || input.device === 'safari')) {
     const phone = await phoneCheck(input.manager, input.targetUrl, input.policy).catch(() => null);
     if (phone) snags.push(phone);
   }

@@ -97,18 +97,17 @@ export class OpenAiProvider implements AIProvider {
       body: JSON.stringify({
         model,
         temperature: 0,
-        max_tokens: 800,
+        max_tokens: request.maxTokens ?? 800,
+        ...(request.json ? { response_format: { type: 'json_object' } } : {}),
         messages: [
           {
             role: 'user',
             content: [
               { type: 'text', text: request.prompt },
-              {
+              ...[{ imageBase64: request.imageBase64, mimeType: request.mimeType }, ...(request.extraImages ?? [])].map((image) => ({
                 type: 'image_url',
-                image_url: {
-                  url: `data:${request.mimeType ?? 'image/png'};base64,${request.imageBase64}`,
-                },
-              },
+                image_url: { url: `data:${image.mimeType ?? 'image/png'};base64,${image.imageBase64}` },
+              })),
             ],
           },
         ],

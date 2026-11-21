@@ -13,12 +13,14 @@ import {
   LayoutDashboard,
   MonitorPlay,
   MousePointerClick,
+  Palette,
   Route,
   ScrollText,
   Workflow,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
 import { AuthCredentialsForm, RetryLoginButton, canRetryLoginFailure, needsLoginCredentials } from '@/components/run/auth-credentials-form';
+import { asDesignReport, DesignReviewView, DesignScoreCard } from '@/components/run/design-review-view';
 import { EventLog } from '@/components/run/event-log';
 import { FindingsPanel, TopFindings } from '@/components/run/findings-list';
 import { FlowGraph } from '@/components/run/flow-graph';
@@ -71,7 +73,10 @@ export default function RunDetailPage() {
   const [chosen, setChosen] = useState<{ runId: string; tab: string } | null>(null);
   const chosenTab = chosen?.runId === runId ? chosen.tab : null;
   const setChosenTab = (next: string) => setChosen({ runId, tab: next });
-  const tab = chosenTab ?? (!data || live ? 'live' : 'overview');
+  // A design-only review has no crawl or tests, so those tabs stay out of the way.
+  const designOnly = data?.bugAudit === false;
+  const hasDesign = Boolean(data?.designReview);
+  const tab = chosenTab ?? (!data || live ? 'live' : designOnly ? 'design' : 'overview');
 
   const updateFinding = useMutation({
     mutationFn: ({
@@ -158,7 +163,9 @@ export default function RunDetailPage() {
             <span className="font-medium">
               {openFindings.length} snag{openFindings.length === 1 ? '' : 's'} found so far.
             </span>{' '}
-            <span className="text-muted-foreground">The full audit is still running and may find more.</span>
+            <span className="text-muted-foreground">
+              {designOnly ? 'The design review is still running.' : 'The full audit is still running and may find more.'}
+            </span>
           </p>
           <Button size="sm" variant="outline" onClick={() => setChosenTab('findings')}>
             See them now
@@ -173,33 +180,45 @@ export default function RunDetailPage() {
               {live ? <span className="live-dot" aria-hidden /> : <MonitorPlay />}
               Live
             </TabsTrigger>
-            <TabsTrigger value="overview">
-              <LayoutDashboard />
-              Overview
-            </TabsTrigger>
+            {!designOnly ? (
+              <TabsTrigger value="overview">
+                <LayoutDashboard />
+                Overview
+              </TabsTrigger>
+            ) : null}
+            {hasDesign ? (
+              <TabsTrigger value="design">
+                <Palette />
+                Design
+              </TabsTrigger>
+            ) : null}
             <TabsTrigger value="findings">
               <Bug />
               Findings
               <TabCount value={openFindings.length} />
             </TabsTrigger>
-            <TabsTrigger value="tests">
-              <FlaskConical />
-              Tests
-              <TabCount value={data?.testCases?.length ?? 0} />
-            </TabsTrigger>
-            <TabsTrigger value="journeys">
-              <Route />
-              Journeys
-              <TabCount value={Array.isArray(payload.journeys) ? payload.journeys.length : 0} />
-            </TabsTrigger>
-            <TabsTrigger value="interactions">
-              <MousePointerClick />
-              Interactions
-            </TabsTrigger>
-            <TabsTrigger value="flows">
-              <Workflow />
-              Flows
-            </TabsTrigger>
+            {!designOnly ? (
+              <>
+              <TabsTrigger value="tests">
+                <FlaskConical />
+                Tests
+                <TabCount value={data?.testCases?.length ?? 0} />
+              </TabsTrigger>
+              <TabsTrigger value="journeys">
+                <Route />
+                Journeys
+                <TabCount value={Array.isArray(payload.journeys) ? payload.journeys.length : 0} />
+              </TabsTrigger>
+              <TabsTrigger value="interactions">
+                <MousePointerClick />
+                Interactions
+              </TabsTrigger>
+              <TabsTrigger value="flows">
+                <Workflow />
+                Flows
+              </TabsTrigger>
+              </>
+            ) : null}
             <TabsTrigger value="evidence">
               <ImageIcon />
               Evidence
@@ -233,6 +252,7 @@ export default function RunDetailPage() {
                 />
                 <div className="grid items-start gap-6 lg:grid-cols-2">
                   <TopFindings findings={allFindings} onOpen={() => setChosenTab('findings')} />
+                  <DesignScoreCard report={asDesignReport(data.designReport)} onOpen={() => setChosenTab('design')} />
                   <SinceLastRunCard payload={payload} previousRunId={data.previousRunId} />
                   <HealthScoreCard payload={payload} />
                   <SafetySummaryCard payload={payload} effectiveMode={data.effectiveSafetyMode} />
@@ -258,6 +278,10 @@ export default function RunDetailPage() {
             ) : (
               <Skeleton className="h-64 w-full rounded-lg" />
             )}
+          </TabsContent>
+
+          <TabsContent value="design">
+            {data ? <DesignReviewView run={data} live={live} /> : <Skeleton className="h-64 w-full rounded-lg" />}
           </TabsContent>
 
           <TabsContent value="findings">

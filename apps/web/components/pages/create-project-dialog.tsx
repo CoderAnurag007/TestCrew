@@ -51,6 +51,7 @@ export function CreateProjectDialog({
     onSuccess: async (project) => {
       await queryClient.invalidateQueries({ queryKey: ['projects', organizationId] });
       await queryClient.invalidateQueries({ queryKey: ['stats', organizationId] });
+      await queryClient.invalidateQueries({ queryKey: ['onboarding', organizationId] });
       onOpenChange(false);
       setName('');
       setDescription('');
@@ -89,9 +90,9 @@ export function CreateProjectDialog({
               event.preventDefault();
               create.mutate({
                 organizationId,
-                name,
+                name: name.trim() || siteName(baseUrl) || 'My site',
                 description: description || undefined,
-                baseUrl,
+                baseUrl: withScheme(baseUrl),
                 environmentName,
                 safetyMode,
                 stagingUrl: stagingUrl.trim() || undefined,
@@ -100,26 +101,17 @@ export function CreateProjectDialog({
             }}
           >
             <div className="space-y-2">
-              <Label htmlFor="project-name">Name</Label>
-              <Input
-                id="project-name"
-                placeholder="Customer portal"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                autoFocus
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-url">Production URL</Label>
+              <Label htmlFor="project-url">Website address</Label>
               <Input
                 id="project-url"
-                type="url"
-                placeholder="https://app.example.com"
+                inputMode="url"
+                autoComplete="url"
+                placeholder="yourshop.com"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
                 aria-describedby="project-url-help"
                 required
+                autoFocus
               />
               <p id="project-url-help" className="text-xs leading-relaxed text-muted-foreground">
                 Where audits start by default.
@@ -141,6 +133,17 @@ export function CreateProjectDialog({
                     description: 'May submit forms. Never places orders on production.',
                   },
                 ]}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="project-name">
+                Name <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              <Input
+                id="project-name"
+                placeholder={siteName(baseUrl) || 'Customer portal'}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -277,4 +280,19 @@ function ModeChoice({
       </div>
     </fieldset>
   );
+}
+
+/** "yourshop.com" → "https://yourshop.com"; addresses with a scheme are kept. */
+function withScheme(value: string): string {
+  const trimmed = value.trim();
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+/** A readable default name from the address: "https://www.yourshop.com/x" → "yourshop.com". */
+function siteName(value: string): string {
+  try {
+    return new URL(withScheme(value)).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
 }

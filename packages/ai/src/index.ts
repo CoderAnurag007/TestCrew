@@ -6,6 +6,7 @@ export { ExplorerAgent } from './explorer.js';
 export { TestGenerationAgent, filterInventedSelectors, isCatalogSelector } from './test-generation.js';
 export { FailureAnalysisAgent, heuristicFailureAnalysis, clampFailureSeverity } from './failure-analysis.js';
 export { UXAnalysisAgent, heuristicUxFindings } from './ux-analysis.js';
+export { DesignReviewAgent, DESIGN_REVIEW_PROMPT_VERSION, designReviewPrompt, type DesignPageReview } from './design-review.js';
 export { IntentCompiler, validateAgainstCatalog, type CompiledIntent, type IntentCompilerResult } from './intent-compiler.js';
 export { RecordingExplorer, decisionKey, type ExplorerLike, type RecordedDecision } from './decision-recorder.js';
 export {

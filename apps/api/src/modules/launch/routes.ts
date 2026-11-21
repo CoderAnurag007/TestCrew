@@ -266,6 +266,32 @@ export async function registerLaunchRoutes(app: FastifyInstance, send: Fetch = f
     return getUsage(app.prisma, id);
   });
 
+  /** How far a workspace is through first-time setup, for the "Get started" guide. */
+  app.get('/organizations/:id/onboarding', async (request) => {
+    const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+    await requireOrgRole(request, id, 'VIEWER');
+    const [firstProject, firstRun, firstReport, integrations, monitored, alertProjects] = await Promise.all([
+      app.prisma.project.findFirst({ where: { organizationId: id }, orderBy: { createdAt: 'asc' }, select: { id: true, name: true } }),
+      app.prisma.run.findFirst({ where: { organizationId: id, status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'asc' }, select: { id: true, status: true } }),
+      app.prisma.run.findFirst({ where: { organizationId: id, status: 'COMPLETED' }, orderBy: { createdAt: 'asc' }, select: { id: true } }),
+      app.prisma.projectIntegration.count({ where: { organizationId: id } }),
+      app.prisma.project.count({ where: { organizationId: id, monitorCadence: { not: null } } }),
+      app.prisma.project.findMany({ where: { organizationId: id }, select: { alertSettings: true }, take: 50 }),
+    ]);
+    const emailAlerts = alertProjects.some((item) => {
+      const emails = (item.alertSettings as { emails?: unknown } | null)?.emails;
+      return Array.isArray(emails) && emails.length > 0;
+    });
+    const findings = firstReport ? await app.prisma.finding.count({ where: { runId: firstReport.id, suppressed: false, status: { notIn: ['DISMISSED', 'IGNORED'] } } }) : 0;
+    return {
+      project: firstProject,
+      firstRun: firstRun ? { id: firstRun.id, status: firstRun.status } : null,
+      firstReport: firstReport ? { id: firstReport.id, findings } : null,
+      monitoring: monitored > 0,
+      connected: integrations > 0 || emailAlerts,
+    };
+  });
+
   /** Until checkout is connected, plans can be switched by hand outside production. */
   app.post('/organizations/:id/plan', async (request) => {
     if (app.env.NODE_ENV === 'production') throw new HttpError(404, 'Not found');

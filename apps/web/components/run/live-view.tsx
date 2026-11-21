@@ -32,10 +32,10 @@ import { Skeleton, StatCard, StatStrip } from '@/components/ui/premium';
 import { runApi, type LiveActionKind, type LivePhase, type LiveState, type RunDetail } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import {
-  PHASES,
   hostAndPath,
   isImageEvidence,
-  phaseIndexForStatus,
+  phaseIndexFor,
+  phasesFor,
   relativeTime,
   stoppedPhaseIndex,
 } from './run-utils';
@@ -446,7 +446,8 @@ function FrameEmpty({ run, live }: { run: RunDetail; live: boolean }) {
 
 export function PhaseStepper({ run }: { run: RunDetail }) {
   const stopped = run.status === 'FAILED' || run.status === 'CANCELLED';
-  const current = stopped ? stoppedPhaseIndex(run) : phaseIndexForStatus(run.status);
+  const phases = phasesFor(run);
+  const current = stopped ? Math.min(stoppedPhaseIndex(run), phases.length - 2) : phaseIndexFor(run);
   const done = run.status === 'COMPLETED';
   const nowText =
     run.currentAction && run.currentAction !== 'authentication-required' && isLiveRunStatus(run.status)
@@ -458,16 +459,18 @@ export function PhaseStepper({ run }: { run: RunDetail }) {
         <h2 className="text-sm font-semibold text-ink">Mission progress</h2>
         <p className="min-w-0 truncate text-[13px] text-muted-foreground">
           {stopped
-            ? `${run.status === 'FAILED' ? 'Stopped with an error' : 'Cancelled'} during ${PHASES[current]?.toLowerCase()}`
+            ? `${run.status === 'FAILED' ? 'Stopped with an error' : 'Cancelled'} during ${phases[current]?.toLowerCase()}`
             : done
-              ? 'Audit complete'
+              ? run.bugAudit === false
+                ? 'Design review complete'
+                : 'Audit complete'
               : nowText
                 ? <>Now: <span className="text-ink">{nowText}</span></>
                 : 'In progress'}
         </p>
       </div>
       <ol className="flex gap-0 overflow-x-auto overflow-y-hidden px-2 pb-3.5 pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Audit phases">
-        {PHASES.map((label, index) => {
+        {phases.map((label, index) => {
           const isDone = done ? true : index < current;
           const isCurrent = !done && index === current;
           const isStopped = stopped && index === current;

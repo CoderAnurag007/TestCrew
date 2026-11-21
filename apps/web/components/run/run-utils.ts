@@ -134,6 +134,19 @@ export function saveBlob(blob: Blob, fileName: string): void {
 
 export const PHASES = ['Opening', 'Signing in', 'Exploring', 'Generating tests', 'Testing', 'Analyzing', 'Done'] as const;
 
+/** A design-only review skips the crawl and the tests. */
+export const DESIGN_PHASES = ['Opening', 'Signing in', 'Design review', 'Done'] as const;
+
+export function phasesFor(run: { bugAudit?: boolean }): readonly string[] {
+  return run.bugAudit === false ? DESIGN_PHASES : PHASES;
+}
+
+export function phaseIndexFor(run: { bugAudit?: boolean; status: RunStatus }): number {
+  const index = phaseIndexForStatus(run.status);
+  if (run.bugAudit !== false || index < 2) return index;
+  return run.status === 'COMPLETED' ? 3 : 2;
+}
+
 export function phaseIndexForStatus(status: RunStatus): number {
   switch (status) {
     case 'QUEUED':
@@ -164,7 +177,7 @@ export function stoppedPhaseIndex(run: Pick<RunDetail, 'stages' | 'testCases' | 
   if (run.testRuns?.length) return 4;
   if (run.testCases?.length) return 3;
   const names = (run.stages ?? []).map((stage) => stage.name);
-  if (names.some((name) => ['discover', 'explore', 'finalize'].includes(name))) return 2;
+  if (names.some((name) => ['discover', 'explore', 'finalize', 'design'].includes(name))) return 2;
   if (names.includes('authenticate')) return 1;
   return 0;
 }

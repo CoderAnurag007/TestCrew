@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Building2, FolderPlus, Loader2, Plus, Radar } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
@@ -16,6 +16,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { GetStarted } from '@/components/dashboard/get-started';
 import { EmptyState, PageHeader, SectionTitle, Skeleton, StatCard, StatStrip } from '@/components/ui/premium';
 import { orgApi, projectApi, runApi } from '@/lib/queries';
 import { ApiError } from '@/lib/api';
@@ -25,6 +26,8 @@ const RECENT_RUNS = 8;
 
 export default function DashboardPage() {
   const { currentOrg, isLoading, setCurrentOrgId, user } = useSession();
+  // Same cache as the session's list; used to know when the list has really loaded.
+  const orgList = useQuery({ queryKey: ['organizations'], queryFn: orgApi.list, enabled: Boolean(user) });
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
@@ -81,6 +84,15 @@ export default function DashboardPage() {
     onError: (error) => toast.error(error instanceof ApiError ? error.message : 'Could not create workspace'),
   });
 
+  // New accounts get a workspace straight away, so the first thing they do is add their site.
+  const autoCreated = useRef(false);
+  useEffect(() => {
+    if (isLoading || !user || autoCreated.current || !orgList.isSuccess || orgList.data.length > 0) return;
+    autoCreated.current = true;
+    const first = user.name?.trim().split(/\s+/)[0];
+    createOrg.mutate({ name: first ? `${first}'s workspace` : 'My workspace' });
+  }, [isLoading, user, orgList.isSuccess, orgList.data, createOrg]);
+
   const score = stats.data?.averageQualityScore;
   const scoreTone = score == null ? 'default' : score >= 85 ? 'success' : score >= 60 ? 'warning' : 'danger';
   const hasProjects = (projects.data?.length ?? 0) > 0;
@@ -121,6 +133,7 @@ export default function DashboardPage() {
         />
       ) : (
         <>
+          {currentOrg ? <GetStarted organizationId={currentOrg.id} onAddSite={() => setProjectOpen(true)} /> : null}
           {stats.isLoading || isLoading ? (
             <Skeleton className="h-[92px] rounded-lg" />
           ) : (

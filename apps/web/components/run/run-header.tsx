@@ -99,6 +99,8 @@ export function RunHeader({ runId, run }: { runId: string; run: RunDetail | unde
   const live = Boolean(run && isLiveRunStatus(run.status));
   const finished = isFinished(run?.status);
   const completed = run?.status === 'COMPLETED';
+  // A design-only review has no HTML report, tests or AI decisions to replay.
+  const designOnly = run?.bugAudit === false;
 
   const cancel = useMutation({
     mutationFn: () => runApi.cancel(runId),
@@ -110,9 +112,12 @@ export function RunHeader({ runId, run }: { runId: string; run: RunDetail | unde
   });
 
   const replay = useMutation({
-    mutationFn: (projectId: string) => runApi.create(projectId, { replayOfRunId: runId, trigger: 'manual' }),
+    mutationFn: (projectId: string) =>
+      designOnly
+        ? runApi.create(projectId, { bugAudit: false, designReview: true, trigger: 'manual' })
+        : runApi.create(projectId, { replayOfRunId: runId, trigger: 'manual' }),
     onSuccess: (newRun) => {
-      toast.success('Replay started');
+      toast.success(designOnly ? 'Design review started' : 'Replay started');
       router.push(`/runs/${newRun.id}`);
     },
     onError: (error) => toast.error(error instanceof ApiError ? error.message : 'Could not start replay'),
@@ -213,17 +218,19 @@ export function RunHeader({ runId, run }: { runId: string; run: RunDetail | unde
         ) : null}
         {completed ? (
           <>
-            <ReportActions runId={runId} />
+            {!designOnly ? <ReportActions runId={runId} /> : null}
             {run ? <ShareButton runId={runId} projectId={run.projectId} shareToken={run.shareToken} /> : null}
-            <Button
-              variant="outline"
-              onClick={() => downloadTests.mutate()}
-              disabled={downloadTests.isPending}
-              aria-label="Download Playwright tests"
-            >
-              {downloadTests.isPending ? <Loader2 className="animate-spin" /> : <FileCode2 />}
-              Playwright tests
-            </Button>
+            {!designOnly ? (
+              <Button
+                variant="outline"
+                onClick={() => downloadTests.mutate()}
+                disabled={downloadTests.isPending}
+                aria-label="Download Playwright tests"
+              >
+                {downloadTests.isPending ? <Loader2 className="animate-spin" /> : <FileCode2 />}
+                Playwright tests
+              </Button>
+            ) : null}
           </>
         ) : null}
         {run && run.status === 'FAILED' && canRetryLoginFailure(run) ? (
@@ -235,7 +242,7 @@ export function RunHeader({ runId, run }: { runId: string; run: RunDetail | unde
         {run && finished ? (
           <Button variant="outline" onClick={() => replay.mutate(run.projectId)} disabled={replay.isPending}>
             {replay.isPending ? <Loader2 className="animate-spin" /> : <RotateCcw />}
-            Replay run
+            {designOnly ? 'Review again' : 'Replay run'}
           </Button>
         ) : null}
       </div>
