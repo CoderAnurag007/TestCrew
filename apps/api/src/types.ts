@@ -18,6 +18,7 @@ export interface CurrentUser {
       slug: string;
     };
   }>;
+  emailVerified?: boolean;
 }
 
 declare module 'fastify' {

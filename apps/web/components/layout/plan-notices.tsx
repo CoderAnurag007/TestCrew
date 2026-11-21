@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { PLANS } from '@auditor/shared';
@@ -8,7 +8,8 @@ import { useSession } from '@/components/session-provider';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PLAN_LIMIT_EVENT } from '@/lib/api';
-import { planApi } from '@/lib/queries';
+import { authApi, planApi } from '@/lib/queries';
+import { toast } from 'sonner';
 
 /** "Pro trial: 9 days left" line for the sidebar. */
 export function TrialNotice() {
@@ -60,5 +61,30 @@ export function PlanLimitDialog() {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Asks a new user to confirm their email, with a button to send the link again. */
+export function VerifyEmailBanner() {
+  const { user } = useSession();
+  const resend = useMutation({
+    mutationFn: authApi.resendVerification,
+    onSuccess: (result) =>
+      toast.success(result.alreadyVerified ? 'Your email is already confirmed' : `Sent a new link to ${user?.email}`),
+    onError: () => toast.error('Could not send the link. Try again in a minute.'),
+  });
+  if (!user || user.emailVerified !== false) return null;
+  return (
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+      <p className="text-sm text-ink">
+        <span className="font-medium">Confirm your email.</span>{' '}
+        <span className="text-muted-foreground">
+          We sent a link to {user.email}, so audit results and alerts can reach you.
+        </span>
+      </p>
+      <Button size="sm" variant="outline" disabled={resend.isPending || resend.isSuccess} onClick={() => resend.mutate()}>
+        {resend.isSuccess ? 'Link sent' : 'Send it again'}
+      </Button>
+    </div>
   );
 }

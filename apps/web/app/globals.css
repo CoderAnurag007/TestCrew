@@ -85,8 +85,11 @@
   --danger: #c42b1c;
 }
 
-* {
-  border-color: var(--border);
+/* In the base layer, so border-colour utilities (border-[#…]) can override it. */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
 
 html,

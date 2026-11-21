@@ -46,6 +46,10 @@ export const apiEnvSchema = z.object({
   COOKIE_DOMAIN: z.string().optional(),
   CREDENTIAL_ENCRYPTION_KEY: hex32,
   SENTRY_DSN: z.string().optional(),
+  /** Sends password reset and verification emails, e.g. smtps://user:pass@smtp.example.com:465. */
+  SMTP_URL: z.string().optional(),
+  MAIL_FROM: z.string().optional(),
+  ALERT_FROM: z.string().optional(),
   ARTIFACT_DIR: z.string().default('.artifacts'),
   // The API reads the screenshots and reports the worker stores, so it needs the same storage.
   S3_ENDPOINT: z.string().optional(),
@@ -70,6 +74,8 @@ export type ApiEnv = {
   COOKIE_DOMAIN: string | undefined;
   CREDENTIAL_ENCRYPTION_KEY: string;
   SENTRY_DSN: string | undefined;
+  SMTP_URL: string | undefined;
+  MAIL_FROM: string;
   ARTIFACT_DIR: string;
   S3_ENDPOINT: string | undefined;
   S3_REGION: string;
@@ -107,6 +113,8 @@ export function loadApiEnv(env: NodeJS.ProcessEnv = process.env): ApiEnv {
     COOKIE_SECURE: booleanFromEnv(parsed.COOKIE_SECURE, parsed.NODE_ENV === 'production'),
     COOKIE_DOMAIN: blank(parsed.COOKIE_DOMAIN),
     SENTRY_DSN: blank(parsed.SENTRY_DSN),
+    SMTP_URL: blank(parsed.SMTP_URL),
+    MAIL_FROM: blank(parsed.MAIL_FROM) ?? blank(parsed.ALERT_FROM) ?? 'Snaghunt <hello@snaghunt.com>',
     ARTIFACT_DIR: resolveArtifactDir(parsed.ARTIFACT_DIR),
     S3_ENDPOINT: blank(parsed.S3_ENDPOINT),
     S3_BUCKET: blank(parsed.S3_BUCKET),

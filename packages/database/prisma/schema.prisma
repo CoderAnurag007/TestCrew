@@ -141,12 +141,33 @@ model User {
   email        String   @unique
   name         String
   passwordHash String
+  /// When the user proved they own the address (verify link or password reset).
+  emailVerifiedAt    DateTime?
+  /// Sessions started before this are signed out (password reset, account changes).
+  sessionsValidAfter DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   memberships Membership[]
+  authTokens  AuthToken[]
   createdRuns Run[]        @relation("RunCreatedBy")
   auditLogs   AuditLog[]
+}
+
+/// One-time links sent by email: password reset and email verification.
+/// Only a SHA-256 hash of the token is stored.
+model AuthToken {
+  id        String    @id @default(cuid())
+  userId    String
+  purpose   String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Organization {

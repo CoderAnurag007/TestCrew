@@ -27,6 +27,10 @@ x-app-env: &app-env
   S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
   S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
   SENTRY_DSN: ${SENTRY_DSN:-}
+  # Password reset and confirmation emails (API) and alerts (worker).
+  SMTP_URL: ${SMTP_URL:-}
+  MAIL_FROM: ${MAIL_FROM:-}
+  ALERT_FROM: ${ALERT_FROM:-}
 
 services:
   postgres:

@@ -25,6 +25,16 @@ export const loginBodySchema = z.object({
 });
 export type LoginBody = z.infer<typeof loginBodySchema>;
 
+export const forgotPasswordBodySchema = z.object({ email });
+export const resetPasswordBodySchema = z.object({ token: z.string().min(20).max(200), password });
+export const verifyEmailBodySchema = z.object({ token: z.string().min(20).max(200) });
+export const changePasswordBodySchema = z.object({ currentPassword: z.string().min(1).max(200), newPassword: password });
+export const deleteAccountBodySchema = z.object({
+  password: z.string().min(1).max(200),
+  /** The account's email, typed again to confirm. */
+  confirmEmail: z.string().min(3).max(320),
+});
+
 export const membershipPublicSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
@@ -41,6 +51,8 @@ export const sessionUserSchema = z.object({
   email: z.string(),
   name: z.string(),
   memberships: z.array(membershipPublicSchema),
+  /** False until the user opens the link in the verification email. */
+  emailVerified: z.boolean().optional(),
 });
 export type SessionUser = z.infer<typeof sessionUserSchema>;
 

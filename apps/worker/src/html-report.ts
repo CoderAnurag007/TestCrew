@@ -1,5 +1,5 @@
 import { renderHtmlReport, type HtmlReportFinding } from '@auditor/analyzer';
-import type { InteractionMap, JourneyResult } from '@auditor/shared';
+import { DESIGN_AREA_LABELS, DESIGN_AREAS, type DesignReport, type InteractionMap, type JourneyResult } from '@auditor/shared';
 import { BrowserManager } from '@auditor/browser';
 import type { AuditDependencies } from './engine.js';
 
@@ -22,10 +22,13 @@ export async function buildHtmlReport(deps: Pick<AuditDependencies, 'prisma' | '
       states: { select: { name: true, url: true, screenshotKey: true, createdAt: true }, orderBy: { createdAt: 'asc' } },
     },
   });
-  if (!run || !run.report) {
+  const design = run?.designReport as DesignReport | null | undefined;
+  const designOnly = Boolean(run && !run.bugAudit && design);
+  if (!run || (!run.report && !designOnly)) {
     return null;
   }
-  const payload = (run.report.payload ?? {}) as Record<string, unknown>;
+  const report = run.report;
+  const payload = (report?.payload ?? {}) as Record<string, unknown>;
   const breakdown = (payload.scoreBreakdown ?? {}) as { formula?: string; density?: number };
   const diff = payload.diff as
     | { previousRunId: string | null; counts: { new: number; recurring: number; regressed: number; fixed: number }; fixed: Array<{ title: string; severity: string }> }
@@ -82,11 +85,11 @@ export async function buildHtmlReport(deps: Pick<AuditDependencies, 'prisma' | '
       requestedMode: run.project.safetyMode,
       trigger: run.trigger,
     },
-    score: run.report.qualityScore ?? 0,
+    score: designOnly ? (run.designScore ?? 0) : (report?.qualityScore ?? 0),
     scoreFormula: breakdown.formula,
     density: breakdown.density,
     screensExplored: run.states.length,
-    summary: run.report.summary ?? '',
+    summary: report?.summary ?? design?.summary ?? '',
     diff: diff ?? null,
     findings,
     hiddenCount: run.findings.length - visible.length,
@@ -108,7 +111,18 @@ export async function buildHtmlReport(deps: Pick<AuditDependencies, 'prisma' | '
     safety: safety ? { blockedCount: safety.blockedCount, sample: safety.blockedSample ?? [] } : null,
     links: (payload.links as { checked: number; broken: number; skippedUnsafe: number } | undefined) ?? null,
     aiCostUsd: run.aiCostUsd,
-    model: run.report.model && run.report.model !== 'heuristic' ? run.report.model : null,
+    model: report?.model && report.model !== 'heuristic' ? report.model : (design?.ai.model ?? null),
+    design: design
+      ? {
+          score: design.score,
+          areas: DESIGN_AREAS.map((area) => ({ label: DESIGN_AREA_LABELS[area], ...design.areas[area] })),
+          summary: design.summary,
+          strengths: design.strengths,
+          pages: design.metrics.pagesReviewed,
+          aiUsed: design.ai.used,
+          only: designOnly,
+        }
+      : null,
     context: (() => {
       const category = payload.category as { used?: string; detected?: string } | undefined;
       const environment = payload.environment as { kind?: string; transactionsReason?: string; paymentReason?: string } | undefined;

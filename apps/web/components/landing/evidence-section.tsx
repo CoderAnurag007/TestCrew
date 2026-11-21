@@ -11,8 +11,8 @@ const CONTENTS = [
 export function EvidenceSection() {
   return (
     <section id="evidence" className="scroll-mt-16 bg-[#faf9f6] text-[#141414]">
-      <div className="mx-auto grid max-w-[1280px] gap-14 px-4 py-20 sm:px-6 lg:grid-cols-[minmax(0,0.42fr)_minmax(0,0.58fr)] lg:gap-16 lg:px-10 lg:py-28">
-        <div>
+      <div data-reveal className="mx-auto grid max-w-[1280px] gap-14 px-4 py-20 sm:px-6 lg:grid-cols-[minmax(0,0.42fr)_minmax(0,0.58fr)] lg:gap-16 lg:px-10 lg:py-28">
+        <div data-reveal>
           <SectionIndex number="0.03" label="The case file" tone="paper" />
           <h2 className="display mt-6 text-[32px] text-[#141414] sm:text-[44px]">Every bug comes with evidence</h2>
           <p className="mt-6 max-w-[42ch] text-[16px] leading-relaxed text-[#4a4743]">

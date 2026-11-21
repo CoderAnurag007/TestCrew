@@ -69,7 +69,7 @@ export function PricingSection({ signedIn }: { signedIn: boolean }) {
   return (
     <section id="pricing" className="scroll-mt-16 border-b border-[var(--night-line)]">
       <div className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 lg:px-10 lg:py-28">
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+        <div data-reveal className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <SectionIndex number="0.05" label="Pricing" />
             <h2 className="display mt-6 text-[32px] sm:text-[44px]">Priced per site</h2>
@@ -99,7 +99,7 @@ export function PricingSection({ signedIn }: { signedIn: boolean }) {
           </div>
         </div>
 
-        <div className="mt-12 grid gap-px overflow-hidden rounded-xl border border-[var(--night-line)] bg-[var(--night-line)] md:grid-cols-2 xl:grid-cols-4">
+        <div data-reveal className="mt-12 grid gap-px overflow-hidden rounded-xl border border-[var(--night-line)] bg-[var(--night-line)] md:grid-cols-2 xl:grid-cols-4">
           {PLAN_ORDER.map((id) => {
             const plan = PLANS[id];
             const amount = price(id, currency, billing);
@@ -156,7 +156,7 @@ export function PricingSection({ signedIn }: { signedIn: boolean }) {
           Need more than 25 sites, single sign-on or an invoice? <a href="mailto:hello@snaghunt.com" className="text-[var(--night-ink)] underline-offset-4 hover:underline">Talk to us</a>.
         </p>
 
-        <div className="mt-20 grid gap-10 lg:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)] lg:gap-16">
+        <div data-reveal className="mt-20 grid gap-10 lg:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)] lg:gap-16">
           <h3 className="display text-[24px] sm:text-[28px]">Questions</h3>
           <dl className="border-t border-[var(--night-line)]">
             {FAQ.map((item) => (

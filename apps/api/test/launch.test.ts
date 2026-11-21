@@ -289,3 +289,31 @@ describe('design review option', () => {
     await (await getApp()).prisma.run.updateMany({ where: { projectId: project.id }, data: { status: 'CANCELLED' } });
   });
 });
+
+describe('shared design review', () => {
+  it('shows the design review and serves its page screenshots, but no other unlinked screenshots', async () => {
+    const { user, org, project } = await setup();
+    const app = await getApp();
+    const run = await app.prisma.run.create({
+      data: { organizationId: org.id, projectId: project.id, createdById: user.body.id, status: 'COMPLETED', bugAudit: false, designReview: true, designScore: 88 },
+    });
+    await app.storage.put({ key: `runs/${run.id}/design-0-desktop.jpg`, body: Buffer.from('jpg'), contentType: 'image/jpeg' });
+    const shot = await app.prisma.evidence.create({
+      data: { organizationId: org.id, runId: run.id, type: 'SCREENSHOT', storageKey: `runs/${run.id}/design-0-desktop.jpg`, contentType: 'image/jpeg' },
+    });
+    const stray = await app.prisma.evidence.create({
+      data: { organizationId: org.id, runId: run.id, type: 'SCREENSHOT', storageKey: `runs/${run.id}/other.jpg`, contentType: 'image/jpeg' },
+    });
+    await app.prisma.run.update({
+      where: { id: run.id },
+      data: { designReport: { version: 1, score: 88, pages: [{ url: 'https://example.com/', title: 'Home', desktop: shot.id, phone: null }] } },
+    });
+    const { token } = (await injectJson('POST', `/runs/${run.id}/share`, { cookie: user.cookie })).json();
+
+    const report = (await injectJson('GET', `/public/reports/${token}`)).json();
+    expect(report.run).toMatchObject({ bugAudit: false, designScore: 88 });
+    expect(report.design).toMatchObject({ score: 88 });
+    expect((await injectJson('GET', `/public/reports/${token}/evidence/${shot.id}`)).statusCode).toBe(200);
+    expect((await injectJson('GET', `/public/reports/${token}/evidence/${stray.id}`)).statusCode).toBe(404);
+  });
+});

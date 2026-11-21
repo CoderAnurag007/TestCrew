@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Monitor, Palette, Smartphone, Sparkles } from 'lucide-react';
 import {
   DESIGN_AREA_LABELS,
@@ -19,7 +19,20 @@ import { EvidenceImage } from './evidence';
 import { SeverityBadge } from './findings-list';
 import { SEVERITY_ORDER } from './run-utils';
 
-type RunFinding = RunDetail['findings'][number];
+/** What the panel needs from a finding; both a run's findings and a shared report's fit. */
+type DesignFindingLike = {
+  id: string;
+  title: string;
+  severity: string;
+  description: string;
+  recommendation?: string | null;
+  actual?: string | null;
+  url?: string | null;
+  component?: string | null;
+  signature?: string | null;
+  confidence?: number;
+  suppressed?: boolean;
+};
 
 function tone(score: number): string {
   return score >= 85 ? 'text-success' : score >= 60 ? 'text-warning' : 'text-danger';
@@ -74,17 +87,40 @@ export function DesignScoreCard({ report, onOpen }: { report: DesignReport | nul
 }
 
 export function DesignReviewView({ run, live }: { run: RunDetail; live: boolean }) {
-  const report = asDesignReport(run.designReport);
+  return (
+    <DesignReviewPanel
+      report={asDesignReport(run.designReport)}
+      findings={run.findings}
+      live={live}
+      image={(evidenceId, alt) => (
+        <EvidenceImage key={evidenceId} runId={run.id} evidenceId={evidenceId} alt={alt} className="block h-auto rounded-md shadow-sm" />
+      )}
+    />
+  );
+}
+
+/** The design review: scores, what works, the fix list and marked screenshots. */
+export function DesignReviewPanel({
+  report,
+  findings,
+  live = false,
+  image,
+}: {
+  report: DesignReport | null;
+  findings: DesignFindingLike[];
+  live?: boolean;
+  image: (evidenceId: string, alt: string) => ReactNode;
+}) {
   const issues = useMemo(
     () =>
-      run.findings
+      findings
         .filter((item) => isDesignFinding(item) && !item.suppressed)
         .sort(
           (left, right) =>
             SEVERITY_ORDER.indexOf(left.severity as FindingSeverity) - SEVERITY_ORDER.indexOf(right.severity as FindingSeverity) ||
             (right.confidence ?? 0.5) - (left.confidence ?? 0.5),
         ),
-    [run.findings],
+    [findings],
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [area, setArea] = useState<DesignArea | 'all'>('all');
@@ -285,13 +321,7 @@ export function DesignReviewView({ run, live }: { run: RunDetail; live: boolean 
           <div className="max-h-[75vh] overflow-y-auto bg-well p-3">
             {evidenceId ? (
               <div className={cn('relative mx-auto', activeShot === 'phone' ? 'max-w-[380px]' : 'w-full')}>
-                <EvidenceImage
-                  key={evidenceId}
-                  runId={run.id}
-                  evidenceId={evidenceId}
-                  alt={`${pathOf(page?.url ?? '')} on a ${activeShot === 'phone' ? 'phone' : 'computer'}`}
-                  className="block h-auto rounded-md shadow-sm"
-                />
+                {image(evidenceId, `${pathOf(page?.url ?? '')} on a ${activeShot === 'phone' ? 'phone' : 'computer'}`)}
                 {boxes.map(({ box, n }, index) => (
                   <span
                     key={index}
@@ -324,7 +354,7 @@ export function DesignReviewView({ run, live }: { run: RunDetail; live: boolean 
   );
 }
 
-function IssueDetail({ finding }: { finding: RunFinding }) {
+function IssueDetail({ finding }: { finding: DesignFindingLike }) {
   return (
     <div className="space-y-3 bg-well px-5 pb-4 pl-[52px] text-[14px] leading-relaxed">
       <p className="text-ink">{finding.description}</p>

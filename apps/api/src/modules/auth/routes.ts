@@ -6,6 +6,7 @@ import { HttpError } from '../../lib/http-error.js';
 import { hashPassword, verifyPassword } from '../../lib/password.js';
 import { createSession, destroySession } from '../../lib/session.js';
 import { requireAuth } from '../../middleware/auth.js';
+import { sendVerificationEmail } from './account.js';
 
 function cookieOptions(app: FastifyInstance) {
   return {
@@ -53,6 +54,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         email: user.email,
         name: user.name,
         memberships: [],
+        emailVerified: false,
       };
       request.currentUser = payload;
 
@@ -61,6 +63,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         resourceType: 'User',
         resourceId: user.id,
       });
+      await sendVerificationEmail(app, user);
 
       return reply.status(201).send(payload);
     },
@@ -106,6 +109,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
           role: membership.role,
           organization: membership.organization,
         })),
+        emailVerified: Boolean(user.emailVerifiedAt),
       };
       request.currentUser = payload;
 

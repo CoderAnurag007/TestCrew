@@ -1,3 +1,4 @@
+import { DemoVideo } from './demo-video';
 import { SectionIndex } from './section-index';
 
 const STEPS = [
@@ -22,10 +23,18 @@ const STEPS = [
 export function HowItWorksSection() {
   return (
     <section id="how-it-works" className="scroll-mt-16 border-b border-[var(--night-line)]">
-      <div className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 lg:px-10 lg:py-28">
+      <div data-reveal className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 lg:px-10 lg:py-28">
         <SectionIndex number="0.02" label="The shift" />
-        <h2 className="display mt-6 max-w-[16ch] text-[32px] sm:text-[44px]">How an audit runs</h2>
-        <ol className="mt-14 grid gap-px overflow-hidden border border-[var(--night-line)] bg-[var(--night-line)] sm:grid-cols-2 lg:grid-cols-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <h2 className="display mt-6 max-w-[16ch] text-[32px] sm:text-[44px]">How an audit runs</h2>
+          <p className="max-w-[40ch] text-[15px] leading-relaxed text-[var(--night-dim)]">
+            From pasting an address to a bug report with evidence, in forty seconds.
+          </p>
+        </div>
+        <div className="mt-12">
+          <DemoVideo />
+        </div>
+        <ol data-reveal className="mt-10 grid gap-px overflow-hidden border border-[var(--night-line)] bg-[var(--night-line)] sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((step, index) => (
             <li key={step.title} className="bg-[var(--night)] p-6 lg:p-7">
               <span className="font-display block text-[44px] font-bold leading-none text-[#2a2d33] [font-stretch:125%]">

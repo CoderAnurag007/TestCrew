@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve, sep } from 'node:path';
 import type { ObjectStorage, PutObjectInput } from './types.js';
 
@@ -26,5 +26,11 @@ export class LocalFileStorage implements ObjectStorage {
 
   async get(key: string): Promise<Buffer> {
     return readFile(this.resolveKey(key));
+  }
+
+  async deletePrefix(prefix: string): Promise<void> {
+    const path = this.resolveKey(prefix.replace(/\/+$/, ''));
+    if (path === resolve(this.rootDir)) throw new Error('Refusing to delete the whole storage folder');
+    await rm(path, { recursive: true, force: true });
   }
 }

@@ -30,7 +30,7 @@ function createClient(): QueryClient {
     if (!(error instanceof ApiError) || error.status !== 401 || isSessionCheck) {
       return;
     }
-    if (!notified && typeof window !== 'undefined' && !['/login', '/register', '/'].includes(window.location.pathname)) {
+    if (!notified && typeof window !== 'undefined' && !['/login', '/register', '/', '/forgot-password', '/reset-password', '/verify-email'].includes(window.location.pathname)) {
       notified = true;
       toast.error('Your session ended. Please sign in again.');
       setTimeout(() => {

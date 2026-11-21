@@ -13,6 +13,7 @@ import { assertSafeNavigationTarget, UnsafeTargetError } from '@auditor/shared/s
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { writeAuditLog } from '../../lib/audit.js';
+import { purgeRunFiles } from '../../lib/purge.js';
 import { HttpError } from '../../lib/http-error.js';
 import { requireOrgRole, requireProjectAccess } from '../../middleware/auth.js';
 import { randomBytes } from 'node:crypto';
@@ -355,7 +356,9 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     async (request, reply) => {
       const { id } = projectIdParamsSchema.parse(request.params);
       const { project } = await requireProjectAccess(request, id, 'ADMIN');
+      const runs = await app.prisma.run.findMany({ where: { projectId: id }, select: { id: true } });
       await app.prisma.project.delete({ where: { id } });
+      await purgeRunFiles(app, runs.map((run) => run.id));
       await writeAuditLog(app.prisma, request, {
         action: 'project.delete',
         resourceType: 'Project',

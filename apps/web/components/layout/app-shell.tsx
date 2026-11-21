@@ -12,10 +12,11 @@ import {
   LogOut,
   Menu,
   Plus,
+  UserRound,
   type LucideIcon,
 } from 'lucide-react';
 import { useSession } from '@/components/session-provider';
-import { PlanLimitDialog, TrialNotice } from '@/components/layout/plan-notices';
+import { PlanLimitDialog, TrialNotice, VerifyEmailBanner } from '@/components/layout/plan-notices';
 import { Brand, BrandMark } from '@/components/shell/brand';
 import {
   NEW_PROJECT_EVENT,
@@ -102,6 +103,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <main className="relative flex-1">
           <div className="mx-auto w-full max-w-[1248px] px-4 pb-20 pt-8 sm:px-6 lg:px-10">
+            <VerifyEmailBanner />
             {children}
           </div>
         </main>
@@ -214,6 +216,12 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <DropdownMenuContent side="top" align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-56 p-1">
             <DropdownMenuLabel className="truncate">{user?.email}</DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem asChild className="gap-2 rounded-md">
+              <Link href="/account" onClick={onNavigate}>
+                <UserRound className="size-4" />
+                Account settings
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 rounded-md" onSelect={() => void logout()}>
               <LogOut className="size-4" />
               Sign out

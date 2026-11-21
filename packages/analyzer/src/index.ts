@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectsCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { LocalFileStorage } from './local-storage.js';
 import type { ObjectStorage, PutObjectInput } from './types.js';
 
@@ -63,6 +63,21 @@ export class S3CompatibleStorage implements ObjectStorage {
       throw new Error(`Object not found: ${key}`);
     }
     return Buffer.from(bytes);
+  }
+
+  async deletePrefix(prefix: string): Promise<void> {
+    if (!prefix.replace(/\/+$/, '')) throw new Error('Refusing to delete the whole bucket');
+    let token: string | undefined;
+    do {
+      const page = await this.client.send(
+        new ListObjectsV2Command({ Bucket: this.options.bucket, Prefix: prefix, ContinuationToken: token }),
+      );
+      const keys = (page.Contents ?? []).map((item) => ({ Key: item.Key! })).filter((item) => item.Key);
+      if (keys.length) {
+        await this.client.send(new DeleteObjectsCommand({ Bucket: this.options.bucket, Delete: { Objects: keys, Quiet: true } }));
+      }
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
   }
 }
 

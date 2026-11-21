@@ -3,7 +3,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { DEVICES, type Device, type PublicReport } from '@auditor/shared';
+import { DEVICES, isDesignFinding, type Device, type PublicReport } from '@auditor/shared';
+import { asDesignReport, DesignReviewPanel } from '@/components/run/design-review-view';
 import { ExternalLink, Printer } from 'lucide-react';
 import { ApiError } from '@/lib/api';
 import { launchApi } from '@/lib/queries';
@@ -77,6 +78,10 @@ export default function SharedReportPage() {
 
 function Report({ token, data }: { token: string; data: PublicReport }) {
   const accent = data.brand.color ?? '#111318';
+  const design = asDesignReport(data.design);
+  const designOnly = data.run.bugAudit === false;
+  // Design findings are shown in the design section, with their marked screenshots.
+  const bugFindings = useMemo(() => (design ? data.findings.filter((item) => !isDesignFinding(item)) : data.findings), [data.findings, design]);
   const counts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const item of data.findings) map[item.severity] = (map[item.severity] ?? 0) + 1;
@@ -109,7 +114,9 @@ function Report({ token, data }: { token: string; data: PublicReport }) {
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-        <p className="text-[13px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Website audit</p>
+        <p className="text-[13px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+          {designOnly ? 'Design review' : 'Website audit'}
+        </p>
         <h1 className="mt-2 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-[34px]">
           {data.project.name}
         </h1>
@@ -122,10 +129,17 @@ function Report({ token, data }: { token: string; data: PublicReport }) {
         </p>
 
         <section className="mt-8 grid gap-3 sm:grid-cols-4">
-          <Stat label="Score" value={data.run.qualityScore != null ? `${Math.round(data.run.qualityScore)}` : '—'} suffix="/100" accent={accent} />
-          <Stat label="Problems found" value={String(data.findings.length)} />
+          {designOnly ? (
+            <Stat label="Design score" value={design ? `${design.score}` : '—'} suffix="/100" accent={accent} />
+          ) : (
+            <Stat label="Score" value={data.run.qualityScore != null ? `${Math.round(data.run.qualityScore)}` : '—'} suffix="/100" accent={accent} />
+          )}
+          <Stat label={designOnly ? 'Things to improve' : 'Problems found'} value={String(data.findings.length)} />
           <Stat label="Serious" value={String(serious)} tone={serious ? 'bad' : undefined} />
-          <Stat label="Pages checked" value={String(data.run.pagesDiscovered)} />
+          <Stat
+            label="Pages checked"
+            value={String(designOnly ? (design?.metrics.pagesReviewed ?? 0) : data.run.pagesDiscovered)}
+          />
         </section>
 
         {data.summary ? (
@@ -135,20 +149,42 @@ function Report({ token, data }: { token: string; data: PublicReport }) {
           </section>
         ) : null}
 
+        {design ? (
+          <section className="mt-10 print:break-before-page">
+            {!designOnly ? <h2 className="mb-4 text-[18px] font-semibold text-ink">Design review</h2> : null}
+            <DesignReviewPanel
+              report={design}
+              findings={data.findings}
+              image={(evidenceId, alt) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={evidenceId}
+                  src={launchApi.publicEvidenceUrl(token, evidenceId)}
+                  alt={alt}
+                  loading="lazy"
+                  className="block h-auto w-full rounded-md bg-well shadow-sm"
+                />
+              )}
+            />
+          </section>
+        ) : null}
+
+        {designOnly ? null : (
         <section className="mt-10">
           <h2 className="text-[18px] font-semibold text-ink">What we found</h2>
-          {data.findings.length === 0 ? (
+          {bugFindings.length === 0 ? (
             <p className="mt-3 rounded-lg border border-border bg-card p-5 text-[15px] text-ink">
               No problems found in this audit.
             </p>
           ) : (
             <ol className="mt-4 space-y-4">
-              {data.findings.map((finding, index) => (
+              {bugFindings.map((finding, index) => (
                 <FindingCard key={finding.id} token={token} finding={finding} index={index + 1} />
               ))}
             </ol>
           )}
         </section>
+        )}
 
         <footer className="mt-14 border-t border-border pt-6 text-[13px] text-muted-foreground">
           {data.brand.footer ? <p className="text-ink">{data.brand.footer}</p> : null}

@@ -65,6 +65,16 @@ export interface HtmlReportInput {
     reason?: string;
     steps: Array<{ goal: string; status: string; detail: string; image?: string | null; checks?: Array<{ name: string; passed: boolean; expected?: string; actual?: string }> }>;
   }>;
+  /** The optional design review: scores per area, what works, and (for a design-only run) no bug sections. */
+  design?: {
+    score: number;
+    areas: Array<{ label: string; score: number; issues: number }>;
+    summary: string | null;
+    strengths: string[];
+    pages: number;
+    aiUsed: boolean;
+    only: boolean;
+  } | null;
   interactions?: {
     probed: number;
     totals: Record<string, number>;
@@ -169,6 +179,21 @@ export function renderHtmlReport(input: HtmlReportInput): string {
         .join('')}</div>`
     : '<p class="muted">No screens were captured.</p>';
 
+  const design = input.design;
+  const designHtml = design
+    ? `<section id="design"><h2>Design review</h2>
+  <p class="lead">${esc(design.summary ?? `Layout, readability, phone view, accessibility and consistency, reviewed on ${design.pages} page${design.pages === 1 ? '' : 's'} on a computer and a phone.`)}</p>
+  <div class="stats">
+    ${stat('Design score', `${Math.round(design.score)}/100`, design.score >= 85 ? '#127a3e' : design.score >= 60 ? '#a85a00' : '#c42b1c')}
+    ${design.areas.map((area) => stat(`${area.label}${area.issues ? ` · ${area.issues}` : ''}`, area.score, area.score >= 85 ? undefined : area.score >= 60 ? '#a85a00' : '#c42b1c')).join('')}
+  </div>
+  ${design.strengths.length ? `<h3>What works well</h3><ul>${design.strengths.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>` : ''}
+  ${design.aiUsed ? '' : '<p class="muted small">The AI review was not available for this run, so the design review covers the measured checks only.</p>'}
+  <p class="muted small">Design findings are listed with the others below, each with where it is and how to fix it.</p>
+</section>`
+    : '';
+  const only = Boolean(design?.only);
+
   const journeysHtml = input.journeys && input.journeys.length
     ? `<section id="journeys"><h2>Journeys</h2>${
         input.context
@@ -231,34 +256,34 @@ export function renderHtmlReport(input: HtmlReportInput): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Audit report · ${esc(host)}</title>
+<title>${only ? 'Design review' : 'Audit report'} · ${esc(host)}</title>
 <style>${CSS}</style>
 </head>
 <body>
 <header class="hero">
   <div class="wrap hero-grid">
     <div>
-      <p class="eyebrow">Snaghunt audit report</p>
+      <p class="eyebrow">Snaghunt ${only ? 'design review' : 'audit report'}</p>
       <h1>${esc(input.project.name)}</h1>
       <p class="target">${esc(input.project.baseUrl)}</p>
       <div class="meta">
         <span>${esc(formatDate(input.run.completedAt ?? input.generatedAt))}</span>
         ${input.run.durationMs ? `<span>${esc(formatDuration(input.run.durationMs))}</span>` : ''}
         <span>${esc(input.run.mode === 'READ_ONLY' ? 'Read-only' : 'Full')} mode</span>
-        <span>${input.screensExplored} screens</span>
+        ${only ? `<span>${design!.pages} pages</span>` : `<span>${input.screensExplored} screens</span>`}
         ${input.model ? `<span>AI: ${esc(input.model)}</span>` : ''}
       </div>
     </div>
     <div class="ring" style="--score:${clamp(input.score)};--ring:${scoreColor}" role="img" aria-label="Health score ${input.score} out of 100">
-      <div><strong>${Math.round(input.score)}</strong><span>Health</span></div>
+      <div><strong>${Math.round(input.score)}</strong><span>${only ? 'Design' : 'Health'}</span></div>
     </div>
   </div>
 </header>
 <nav class="toc wrap">
-  <a href="#summary">Summary</a><a href="#changes">Changes</a><a href="#findings">Findings (${input.findings.length})</a><a href="#screens">Screens</a><a href="#tests">Tests</a>${input.journeys?.length ? '<a href="#journeys">Journeys</a>' : ''}${input.interactions ? '<a href="#interactions">Controls</a>' : ''}${input.intents?.length ? '<a href="#intents">Expectations</a>' : ''}<a href="#method">Method</a>
+  ${only ? '' : '<a href="#summary">Summary</a><a href="#changes">Changes</a>'}${design ? '<a href="#design">Design</a>' : ''}<a href="#findings">Findings (${input.findings.length})</a>${only ? '' : '<a href="#screens">Screens</a><a href="#tests">Tests</a>'}${input.journeys?.length ? '<a href="#journeys">Journeys</a>' : ''}${input.interactions ? '<a href="#interactions">Controls</a>' : ''}${input.intents?.length ? '<a href="#intents">Expectations</a>' : ''}<a href="#method">Method</a>
 </nav>
 <main class="wrap">
-<section id="summary">
+${only ? '' : `<section id="summary">
   <h2>Summary</h2>
   <p class="lead">${esc(input.summary)}</p>
   <div class="stats">
@@ -267,14 +292,15 @@ export function renderHtmlReport(input: HtmlReportInput): string {
     ${stat('Tests failed', failed, failed ? '#c42b1c' : undefined)}
   </div>
 </section>
-<section id="changes"><h2>Since the last run</h2>${diffHtml}</section>
+<section id="changes"><h2>Since the last run</h2>${diffHtml}</section>`}
+${designHtml}
 <section id="findings">
   <h2>Findings</h2>
   ${input.findings.length ? findingsHtml : '<p class="empty">No issues were found on the screens that were explored.</p>'}
   ${input.hiddenCount ? `<p class="muted small">${input.hiddenCount} finding${input.hiddenCount === 1 ? ' is' : 's are'} hidden because they were marked “not a bug”.</p>` : ''}
 </section>
-<section id="screens"><h2>Screens explored</h2>${screensHtml}</section>
-<section id="tests"><h2>Tests</h2>${testsHtml}</section>
+${only ? '' : `<section id="screens"><h2>Screens explored</h2>${screensHtml}</section>
+<section id="tests"><h2>Tests</h2>${testsHtml}</section>`}
 ${journeysHtml}
 ${interactionsHtml}
 ${intentsHtml}
@@ -282,7 +308,8 @@ ${intentsHtml}
   <h2>How this audit was run</h2>
   ${safetyHtml}
   ${input.links ? `<p>${input.links.checked} same-site links were checked; ${input.links.broken} were broken. ${input.links.skippedUnsafe} links that could change state (logout, delete, cart) were not followed.</p>` : ''}
-  <p>Health score: ${esc(input.scoreFormula ?? '')}${typeof input.density === 'number' ? ` Weighted defects per screen: ${input.density}.` : ''}</p>
+  ${only ? '<p>Design score: each of six areas starts at 100 and loses points per issue by severity; the design score is their average.</p>' : ''}
+  <p>${only ? '' : `Health score: ${esc(input.scoreFormula ?? '')}`}${typeof input.density === 'number' ? ` Weighted defects per screen: ${input.density}.` : ''}</p>
   <p class="muted small">Run ${esc(input.run.id)} · generated ${esc(input.generatedAt.toISOString())}${typeof input.aiCostUsd === 'number' ? ` · AI cost $${input.aiCostUsd.toFixed(4)}` : ''}</p>
 </section>
 </main>

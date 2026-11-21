@@ -339,8 +339,11 @@ export async function registerLaunchRoutes(app: FastifyInstance, send: Fetch = f
         testsPassed: run.testsPassed,
         startedAt: run.startedAt,
         completedAt: run.completedAt,
+        bugAudit: run.bugAudit,
+        designScore: run.designScore,
       },
       summary: run.report?.summary ?? null,
+      design: run.designReport ?? null,
       findings: findings.map((item) => ({
         id: item.id,
         title: item.title,
@@ -353,6 +356,8 @@ export async function registerLaunchRoutes(app: FastifyInstance, send: Fetch = f
         actual: item.actual,
         recommendation: item.recommendation,
         change: item.change,
+        component: item.component,
+        confidence: item.confidence,
         screenshots: item.evidence.map((evidence) => ({ id: evidence.id, caption: evidence.fileName ?? 'Screenshot' })),
       })),
     };
@@ -362,12 +367,18 @@ export async function registerLaunchRoutes(app: FastifyInstance, send: Fetch = f
   app.get('/public/reports/:token/evidence/:evidenceId', async (request, reply) => {
     const run = await findSharedRun(app, request);
     const { evidenceId } = z.object({ evidenceId: z.string().min(1).max(64) }).parse(request.params);
+    // Screenshots of visible findings, and the page screenshots of the design review.
+    const designShots = new Set(
+      ((run.designReport as { pages?: Array<{ desktop?: string | null; phone?: string | null }> } | null)?.pages ?? []).flatMap((page) =>
+        [page.desktop, page.phone].filter((id): id is string => Boolean(id)),
+      ),
+    );
     const evidence = await app.prisma.evidence.findFirst({
       where: {
         id: evidenceId,
         runId: run.id,
         type: 'SCREENSHOT',
-        finding: { suppressed: false, status: { notIn: ['DISMISSED', 'IGNORED'] } },
+        ...(designShots.has(evidenceId) ? {} : { finding: { suppressed: false, status: { notIn: ['DISMISSED', 'IGNORED'] } } }),
       },
     });
     if (!evidence || !evidence.contentType.startsWith('image/')) throw new HttpError(404, 'Not found');

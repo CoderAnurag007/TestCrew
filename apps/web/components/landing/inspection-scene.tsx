@@ -12,12 +12,12 @@ import { cn } from '@/lib/utils';
  * Pure CSS 3D, no WebGL, so every label stays sharp.
  */
 
-const PAGE_W = 600;
-const PAGE_H = 430;
+export const PAGE_W = 600;
+export const PAGE_H = 430;
 const STEP_MS = 1800;
 
 type Verdict = 'pass' | 'bug';
-type Target = {
+export type Target = {
   id: string;
   /** Exact box of the control on the page. */
   box: { x: number; y: number; w: number; h: number };
@@ -32,7 +32,7 @@ type Target = {
 
 const PAD = 4;
 
-const TARGETS: Target[] = [
+export const TARGETS: Target[] = [
   {
     id: '#031',
     box: { x: 376, y: 172, w: 34, h: 28 },
@@ -104,10 +104,19 @@ export function InspectionScene({ className, compact = false }: { className?: st
   // Walk through the controls, hold on the finished page, then start over.
   useEffect(() => {
     if (reduced) return;
-    const timer = window.setInterval(() => {
-      setStep((current) => (current >= TARGETS.length + 2 ? 0 : current + 1));
-    }, STEP_MS);
-    return () => window.clearInterval(timer);
+    // Start once the page has set up (and the opening, if any, has played), so the first click is seen.
+    const startIn = /^play/.test(document.documentElement.getAttribute('data-intro') ?? '') ? 3600 : 1400;
+    let timer = 0;
+    const start = window.setTimeout(() => {
+      setStep((current) => current + 1);
+      timer = window.setInterval(() => {
+        setStep((current) => (current >= TARGETS.length + 2 ? 0 : current + 1));
+      }, STEP_MS);
+    }, startIn);
+    return () => {
+      window.clearTimeout(start);
+      window.clearInterval(timer);
+    };
   }, [reduced]);
 
   // `tried` controls have a verdict; `active` is the one under the lamp.
@@ -258,7 +267,7 @@ function VerdictTag({ target }: { target: Target }) {
 /* Browser windows                                                     */
 /* ------------------------------------------------------------------ */
 
-function Window({ path, children }: { path: string; children: React.ReactNode }) {
+export function Window({ path, children }: { path: string; children: React.ReactNode }) {
   return (
     <div className="clay-window">
       <div className="clay-shell" />
@@ -349,7 +358,7 @@ function StoreHeader({ cartCount }: { cartCount: number }) {
   );
 }
 
-function ProductPage({ sizeSelected, cartCount }: { sizeSelected: boolean; cartCount: number }) {
+export function ProductPage({ sizeSelected, cartCount }: { sizeSelected: boolean; cartCount: number }) {
   return (
     <div className="absolute inset-0 font-sans text-[#1a1a1a]">
       <StoreHeader cartCount={cartCount} />
@@ -462,7 +471,7 @@ function BrokenThumb({ x }: { x: number }) {
 }
 
 /** Side view of a trail running shoe. */
-function Shoe({ className, upper, toe }: { className?: string; upper: string; toe: string }) {
+export function Shoe({ className, upper, toe }: { className?: string; upper: string; toe: string }) {
   return (
     <svg viewBox="0 0 200 104" className={className} fill="none">
       {/* outsole lugs */}

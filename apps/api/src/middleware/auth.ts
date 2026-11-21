@@ -10,6 +10,9 @@ const PUBLIC_PREFIXES = [
   '/auth/login',
   '/auth/register',
   '/auth/logout',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/verify-email',
   '/health',
   '/public',
   '/docs',
@@ -36,6 +39,8 @@ export async function authPreHandler(request: FastifyRequest, _reply: FastifyRep
       id: true,
       email: true,
       name: true,
+      emailVerifiedAt: true,
+      sessionsValidAfter: true,
       memberships: {
         select: {
           id: true,
@@ -51,7 +56,12 @@ export async function authPreHandler(request: FastifyRequest, _reply: FastifyRep
   if (!user) {
     return;
   }
-  request.currentUser = user;
+  // Sessions from before a password reset or change no longer count.
+  if (user.sessionsValidAfter && new Date(session.createdAt) < user.sessionsValidAfter) {
+    return;
+  }
+  const { emailVerifiedAt, sessionsValidAfter: _ignored, ...rest } = user;
+  request.currentUser = { ...rest, emailVerified: Boolean(emailVerifiedAt) };
 }
 
 async function authenticateApiToken(request: FastifyRequest, raw: string): Promise<void> {

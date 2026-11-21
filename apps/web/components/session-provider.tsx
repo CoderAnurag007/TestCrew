@@ -51,7 +51,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const isLanding = pathname === '/';
     const isAuthForm = pathname === '/login' || pathname === '/register';
     const isSharedReport = pathname.startsWith('/r/');
-    const publicPath = isLanding || isAuthForm || isSharedReport;
+    // Reachable without signing in: password and email links, and the legal pages.
+    const isOpenPage = ['/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy', '/refunds', '/film'].includes(pathname);
+    const publicPath = isLanding || isAuthForm || isSharedReport || isOpenPage;
     if (me.isLoading) {
       return;
     }

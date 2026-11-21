@@ -9,7 +9,7 @@ type LandingNavProps = {
 
 export function LandingNav({ signedIn, primaryHref, primaryLabel }: LandingNavProps) {
   return (
-    <header className="sticky top-0 z-50 border-b border-[var(--night-line)] bg-[var(--night)]">
+    <header className="enter-down sticky top-0 z-50 border-b border-[var(--night-line)] bg-[var(--night)]">
       <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
         <Brand tone="night" />
         <nav aria-label="Main" className="flex items-center gap-1 sm:gap-2">
@@ -26,13 +26,13 @@ export function LandingNav({ signedIn, primaryHref, primaryLabel }: LandingNavPr
             Pricing
           </Link>
           {!signedIn ? (
-            <Link href="/login" className="px-3 py-2 text-sm text-[var(--night-dim)] transition-colors hover:text-[var(--night-ink)]">
+            <Link href="/login" className="whitespace-nowrap px-2 py-2 text-sm sm:px-3 text-[var(--night-dim)] transition-colors hover:text-[var(--night-ink)]">
               Sign in
             </Link>
           ) : null}
           <Link
             href={primaryHref}
-            className="ml-1 inline-flex h-9 items-center rounded-full bg-[var(--night-ink)] px-4 text-sm font-medium text-black transition-colors hover:bg-white"
+            className="ml-1 inline-flex h-9 items-center whitespace-nowrap rounded-full bg-[var(--night-ink)] px-4 text-sm font-medium text-black transition-colors hover:bg-white"
           >
             {primaryLabel}
           </Link>

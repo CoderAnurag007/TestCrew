@@ -35,6 +35,19 @@ export const authApi = {
     api<SessionUser>('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   logout: () => api<void>('/auth/logout', { method: 'POST' }),
   me: () => api<SessionUser>('/auth/me'),
+  forgotPassword: (email: string) =>
+    api<{ ok: true }>('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (payload: { token: string; password: string }) =>
+    api<void>('/auth/reset-password', { method: 'POST', body: JSON.stringify(payload) }),
+  verifyEmail: (token: string) => api<{ ok: true }>('/auth/verify-email', { method: 'POST', body: JSON.stringify({ token }) }),
+  resendVerification: () => api<{ ok: true; alreadyVerified: boolean }>('/auth/resend-verification', { method: 'POST' }),
+  changePassword: (payload: { currentPassword: string; newPassword: string }) =>
+    api<void>('/auth/change-password', { method: 'POST', body: JSON.stringify(payload) }),
+  deleteAccount: (payload: { password: string; confirmEmail: string }) =>
+    api<{ workspacesDeleted: number; workspacesKept: number }>('/auth/account', {
+      method: 'DELETE',
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const orgApi = {

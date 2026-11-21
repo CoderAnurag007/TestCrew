@@ -59,7 +59,9 @@ skipped/neutral `#6B7079`. Each has a light tint for badge backgrounds.
 ## Motion
 
 - Only in response to an action (open, expand, confirm) or to show live progress.
-- No entrance animations on page load, no hover lift on cards.
+- No entrance animations on page load inside the app, no hover lift on cards.
+  The landing page is the exception: a short opening (once per tab, skippable) and
+  the hero setting itself up, then sections fading up as they scroll in (`motion.css`).
 - Everything respects `prefers-reduced-motion`.
 
 ## Writing

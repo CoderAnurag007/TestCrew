@@ -11,6 +11,7 @@ import { ZodError } from 'zod';
 import { AUDIT_QUEUE_NAME } from './lib/constants.js';
 import { HttpError } from './lib/http-error.js';
 import { MemoryRunQueue, MemorySessionStore, type RunQueuePort, type SessionStore } from './lib/runtime.js';
+import { registerAccountRoutes } from './modules/auth/account.js';
 import { registerAuthRoutes } from './modules/auth/routes.js';
 import { registerCredentialRoutes } from './modules/credentials/routes.js';
 import { registerLaunchRoutes } from './modules/launch/routes.js';
@@ -119,6 +120,7 @@ export async function buildApp(env: ApiEnv = loadApiEnv()) {
   await registerPlugins(app);
   await registerHealthRoutes(app);
   await registerAuthRoutes(app);
+  await registerAccountRoutes(app);
   await registerOrganizationRoutes(app);
   await registerProjectRoutes(app);
   await registerEnvironmentRoutes(app);

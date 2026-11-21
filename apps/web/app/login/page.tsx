@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { AuthLayout, FormError } from '@/components/pages/auth-layout';
@@ -19,6 +19,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('reset')) {
+      setNotice('Password changed. Sign in with your new password.');
+    }
+  }, []);
 
   const mutation = useMutation({
     mutationFn: authApi.login,
@@ -55,6 +61,11 @@ export default function LoginPage() {
           mutation.mutate({ email, password });
         }}
       >
+        {notice && !error ? (
+          <div role="status" className="rounded-md border border-[#bfe3cb] bg-[#effaf2] px-3 py-2.5 text-sm text-[#12602f]">
+            {notice}
+          </div>
+        ) : null}
         <FormError message={error} />
         <div className="space-y-1.5">
           <Label htmlFor="email">Email</Label>
@@ -70,7 +81,12 @@ export default function LoginPage() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="password">Password</Label>
+          <div className="flex items-baseline justify-between gap-2">
+            <Label htmlFor="password">Password</Label>
+            <Link href="/forgot-password" className="text-[13px] text-muted-foreground underline-offset-4 hover:text-ink hover:underline">
+              Forgot password?
+            </Link>
+          </div>
           <Input
             id="password"
             type="password"

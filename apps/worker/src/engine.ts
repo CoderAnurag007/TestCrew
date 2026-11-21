@@ -18,6 +18,7 @@ import {
 import { orgUsage } from './plan-usage.js';
 import { runQuickScan } from './quick-scan.js';
 import { runDesignReview } from './design-review.js';
+import { buildHtmlReport } from './html-report.js';
 import { asStringArray, callResetHook, resolveSafetyMode } from './safety-mode.js';
 import type { Prisma, PrismaClient, SecretStore } from '@auditor/database';
 import {
@@ -631,6 +632,7 @@ async function finishDesignOnlyRun(
     kind: 'stage',
     message: `Design review complete. Design score ${review.score}/100 with ${review.issues} thing${review.issues === 1 ? '' : 's'} to improve.`,
   });
+  await buildHtmlReport(deps, run.id).catch((error) => deps.logger.warn({ runId: run.id, err: error }, 'HTML report failed'));
 }
 
 async function discoverAndExplore(

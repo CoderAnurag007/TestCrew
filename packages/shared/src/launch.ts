@@ -223,8 +223,13 @@ export const publicReportSchema = z.object({
     testsPassed: z.number(),
     startedAt: z.coerce.date().nullable(),
     completedAt: z.coerce.date().nullable(),
+    /** False for a design-only review. */
+    bugAudit: z.boolean().optional(),
+    designScore: z.number().nullable().optional(),
   }),
   summary: z.string().nullable(),
+  /** The design review (see DesignReport), when the run had one. */
+  design: z.unknown().nullable().optional(),
   findings: z.array(
     z.object({
       id: z.string(),
@@ -238,6 +243,8 @@ export const publicReportSchema = z.object({
       actual: z.string().nullable(),
       recommendation: z.string().nullable(),
       change: z.string(),
+      component: z.string().nullable().optional(),
+      confidence: z.number().optional(),
       screenshots: z.array(z.object({ id: z.string(), caption: z.string() })),
     }),
   ),

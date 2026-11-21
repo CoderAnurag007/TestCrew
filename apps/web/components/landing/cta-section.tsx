@@ -8,7 +8,7 @@ type CtaSectionProps = {
 export function CtaSection({ primaryHref, primaryLabel }: CtaSectionProps) {
   return (
     <section className="border-b border-[var(--night-line)]">
-      <div className="mx-auto flex max-w-[1280px] flex-col items-start gap-10 px-4 py-20 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-10 lg:py-28">
+      <div data-reveal className="mx-auto flex max-w-[1280px] flex-col items-start gap-10 px-4 py-20 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-10 lg:py-28">
         <h2 className="display max-w-[14ch] text-[36px] sm:text-[52px] xl:text-[60px]">
           Find the bugs before your users do.
         </h2>

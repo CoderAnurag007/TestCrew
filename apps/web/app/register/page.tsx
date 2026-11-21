@@ -108,6 +108,17 @@ export default function RegisterPage() {
           {mutation.isPending ? <Loader2 className="animate-spin" /> : null}
           {mutation.isPending ? 'Creating account…' : 'Create account'}
         </Button>
+        <p className="text-[12px] leading-relaxed text-muted-foreground">
+          By creating an account you agree to the{' '}
+          <Link href="/terms" className="text-ink underline underline-offset-4">
+            Terms
+          </Link>{' '}
+          and{' '}
+          <Link href="/privacy" className="text-ink underline underline-offset-4">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </form>
     </AuthLayout>
   );

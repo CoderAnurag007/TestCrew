@@ -155,12 +155,26 @@ export function monitorDevices(value: unknown): Device[] {
   return devices.length ? [...new Set(devices)] : ['desktop'];
 }
 
+/** Deletes security log entries older than 12 months. */
+export async function pruneOldAuditLogs(deps: Pick<AuditDependencies, 'prisma'>, now = new Date()): Promise<number> {
+  const cutoff = new Date(now);
+  cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 1);
+  const result = await deps.prisma.auditLog.deleteMany({ where: { createdAt: { lt: cutoff } } });
+  return result.count;
+}
+
 export function startMonitorLoop(
   deps: AuditDependencies,
   queue: AuditQueuePort | null,
 ): () => void {
+  let lastPrune = 0;
   const tick = () => {
     startDueMonitors(deps, queue).catch((error) => deps.logger.error({ err: error }, 'monitor tick failed'));
+    // Once a day: security logs are kept for 12 months (see the Privacy Policy).
+    if (Date.now() - lastPrune > 24 * 60 * 60 * 1000) {
+      lastPrune = Date.now();
+      pruneOldAuditLogs(deps).catch((error) => deps.logger.warn({ err: error }, 'could not prune old audit logs'));
+    }
   };
   tick();
   const timer = setInterval(tick, TICK_MS);
