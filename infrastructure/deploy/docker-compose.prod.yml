@@ -31,6 +31,9 @@ x-app-env: &app-env
   SMTP_URL: ${SMTP_URL:-}
   MAIL_FROM: ${MAIL_FROM:-}
   ALERT_FROM: ${ALERT_FROM:-}
+  # Free checks from the landing page (no sign-up): daily total and per visitor.
+  FREE_SCAN_DAILY_LIMIT: ${FREE_SCAN_DAILY_LIMIT:-200}
+  FREE_SCAN_PER_VISITOR: ${FREE_SCAN_PER_VISITOR:-3}
 
 services:
   postgres:
@@ -119,6 +122,8 @@ services:
       target: web
       args:
         NEXT_PUBLIC_API_URL: https://${API_DOMAIN:?set API_DOMAIN}
+        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
+        NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-https://us.i.posthog.com}
     restart: unless-stopped
     environment:
       NODE_ENV: production

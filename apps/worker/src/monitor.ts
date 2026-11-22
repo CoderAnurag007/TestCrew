@@ -163,6 +163,34 @@ export async function pruneOldAuditLogs(deps: Pick<AuditDependencies, 'prisma'>,
   return result.count;
 }
 
+/** Unclaimed free checks from the landing page are kept this many days. */
+export const FREE_SCAN_RETENTION_DAYS = 14;
+
+/**
+ * Deletes free checks nobody claimed by signing up: the site, its run, findings
+ * and stored screenshots. Claimed checks belong to a workspace and stay.
+ */
+export async function pruneUnclaimedFreeScans(
+  deps: Pick<AuditDependencies, 'prisma' | 'storage'>,
+  now = new Date(),
+): Promise<number> {
+  const cutoff = new Date(now.getTime() - FREE_SCAN_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const stale = await deps.prisma.freeScan.findMany({
+    where: { claimedAt: null, createdAt: { lt: cutoff } },
+    select: { runId: true, run: { select: { projectId: true, status: true } } },
+    take: 500,
+  });
+  // A run still going (stuck for two weeks) is left to the stuck-run handling.
+  const done = stale.filter((item) => ['COMPLETED', 'FAILED', 'CANCELLED'].includes(item.run.status));
+  if (!done.length) return 0;
+  // Deleting the project removes the run, its rows and the free-scan record with it.
+  await deps.prisma.project.deleteMany({ where: { id: { in: [...new Set(done.map((item) => item.run.projectId))] } } });
+  if (deps.storage.deletePrefix) {
+    for (const item of done) await deps.storage.deletePrefix(`runs/${item.runId}/`).catch(() => undefined);
+  }
+  return done.length;
+}
+
 export function startMonitorLoop(
   deps: AuditDependencies,
   queue: AuditQueuePort | null,
@@ -174,6 +202,7 @@ export function startMonitorLoop(
     if (Date.now() - lastPrune > 24 * 60 * 60 * 1000) {
       lastPrune = Date.now();
       pruneOldAuditLogs(deps).catch((error) => deps.logger.warn({ err: error }, 'could not prune old audit logs'));
+      pruneUnclaimedFreeScans(deps).catch((error) => deps.logger.warn({ err: error }, 'could not prune old free checks'));
     }
   };
   tick();

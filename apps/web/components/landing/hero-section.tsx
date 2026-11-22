@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
+import { FreeCheckForm } from './free-check-form';
 import { InspectionScene } from './inspection-scene';
 import { SectionIndex } from './section-index';
 
@@ -53,23 +54,37 @@ export function HeroSection({ primaryHref, primaryLabel, signedIn }: HeroSection
             Snaghunt works through your web app like a QA crew on the night shift. It tries every control, walks every
             journey, and leaves you the evidence for each thing it finds.
           </p>
-          <div className="enter mt-9 flex flex-wrap items-center gap-3" style={at(0.74)}>
-            <Link
-              href={primaryHref}
-              className="inline-flex h-11 items-center rounded-full bg-[var(--night-ink)] px-5 text-[15px] font-medium text-black transition-colors hover:bg-white"
-            >
-              {primaryLabel}
-            </Link>
-            <Link
-              href={signedIn ? '#evidence' : '/login'}
-              className="inline-flex h-11 items-center rounded-full border border-[var(--night-faint)] px-5 text-[15px] font-medium text-[var(--night-ink)] transition-colors hover:border-[var(--night-dim)]"
-            >
-              {signedIn ? 'See the evidence' : 'Sign in'}
-            </Link>
-          </div>
-          <p className="enter mt-6 max-w-[50ch] text-[13px] leading-relaxed text-[#6b7079]" style={at(0.86)}>
-            Orders are only ever placed on a staging site you name, with sandbox test cards.
-          </p>
+          {signedIn ? (
+            <div className="enter mt-9 flex flex-wrap items-center gap-3" style={at(0.74)}>
+              <Link
+                href={primaryHref}
+                className="inline-flex h-11 items-center rounded-full bg-[var(--night-ink)] px-5 text-[15px] font-medium text-black transition-colors hover:bg-white"
+              >
+                {primaryLabel}
+              </Link>
+              <Link
+                href="#evidence"
+                className="inline-flex h-11 items-center rounded-full border border-[var(--night-faint)] px-5 text-[15px] font-medium text-[var(--night-ink)] transition-colors hover:border-[var(--night-dim)]"
+              >
+                See the evidence
+              </Link>
+            </div>
+          ) : (
+            <div className="enter mt-9" style={at(0.74)}>
+              <FreeCheckForm source="hero" />
+              <p className="mt-2 pl-1 text-[13px] text-[#6b7079]">
+                Want the full audit?{' '}
+                <Link href={primaryHref} className="text-[var(--night-dim)] underline-offset-4 hover:text-[var(--night-ink)] hover:underline">
+                  Create a free account
+                </Link>{' '}
+                or{' '}
+                <Link href="/login" className="text-[var(--night-dim)] underline-offset-4 hover:text-[var(--night-ink)] hover:underline">
+                  sign in
+                </Link>
+                .
+              </p>
+            </div>
+          )}
         </div>
         <div className="scene-enter" style={at(0.2)}>
           <InspectionScene />

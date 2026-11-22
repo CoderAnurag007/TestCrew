@@ -2,10 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DEVICES, isDesignFinding, type Device, type PublicReport } from '@auditor/shared';
 import { asDesignReport, DesignReviewPanel } from '@/components/run/design-review-view';
 import { ExternalLink, Printer } from 'lucide-react';
+import { track } from '@/lib/analytics';
 import { ApiError } from '@/lib/api';
 import { launchApi } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -188,7 +189,11 @@ function Report({ token, data }: { token: string; data: PublicReport }) {
 
         <footer className="mt-14 border-t border-border pt-6 text-[13px] text-muted-foreground">
           {data.brand.footer ? <p className="text-ink">{data.brand.footer}</p> : null}
-          <p className="mt-1">Tested with real browsers by Snaghunt. Every finding includes the steps to reproduce it.</p>
+          {data.poweredBy === false ? (
+            <p className="mt-1">Tested with real browsers. Every finding includes the steps to reproduce it.</p>
+          ) : (
+            <PoweredBy />
+          )}
         </footer>
       </main>
     </div>
@@ -288,5 +293,27 @@ function FindingCard({ token, finding, index }: { token: string; finding: Report
         ) : null}
       </div>
     </li>
+  );
+}
+
+/** "Checked by Snaghunt": every shared report invites its readers to check their own site (not on white-label plans). */
+function PoweredBy() {
+  useEffect(() => {
+    track('shared_report_viewed', { poweredBy: true });
+  }, []);
+  return (
+    <div className="mt-2 flex flex-col gap-4 rounded-lg border border-border bg-card px-5 py-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
+      <p className="leading-relaxed">
+        <span className="font-medium text-ink">Checked by Snaghunt</span>, an AI QA engineer that clicks through websites and reports what is
+        broken, with evidence.
+      </p>
+      <a
+        href="/?ref=report"
+        onClick={() => track('shared_report_cta_clicked')}
+        className="inline-flex h-9 shrink-0 items-center justify-center rounded-full bg-ink px-4 text-[13.5px] font-medium text-white transition-colors hover:bg-[#2a2d33]"
+      >
+        Check your site free
+      </a>
+    </div>
   );
 }

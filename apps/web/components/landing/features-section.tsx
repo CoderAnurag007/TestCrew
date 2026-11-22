@@ -32,7 +32,7 @@ export function FeaturesSection() {
     <section id="features" className="scroll-mt-16 border-b border-[var(--night-line)]">
       <div className="mx-auto grid max-w-[1280px] gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)] lg:gap-16 lg:px-10 lg:py-28">
         <div data-reveal>
-          <SectionIndex number="0.04" label="Built for real apps" />
+          <SectionIndex number="0.05" label="Built for real apps" />
           <h2 className="display mt-6 text-[32px] sm:text-[40px]">Safe on the night shift</h2>
           <p className="mt-5 max-w-[38ch] text-[15px] leading-relaxed text-[var(--night-dim)]">
             It works unsupervised, so the guardrails are built in rather than bolted on.

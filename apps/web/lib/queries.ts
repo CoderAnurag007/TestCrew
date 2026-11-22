@@ -26,6 +26,7 @@ import type {
   TicketProvider,
   PlanId,
   Usage,
+  FreeScanView,
 } from '@auditor/shared';
 
 export const authApi = {
@@ -72,6 +73,7 @@ export const projectApi = {
     safetyMode?: SafetyMode;
     stagingUrl?: string;
     stagingSafetyMode?: SafetyMode;
+    designReview?: boolean;
   }) => api<ProjectDetail>('/projects', { method: 'POST', body: JSON.stringify(payload) }),
   update: (
     id: string,
@@ -451,4 +453,19 @@ export type Onboarding = {
 
 export const onboardingApi = {
   get: (organizationId: string) => api<Onboarding>(`/organizations/${organizationId}/onboarding`),
+};
+
+const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
+/** Free checks from the landing page: no account needed to start one or see its teaser. */
+export const freeScanApi = {
+  start: (url: string) =>
+    api<{ token: string; reused: boolean }>('/public/free-scans', { method: 'POST', body: JSON.stringify({ url }) }),
+  get: (token: string) => api<FreeScanView>(`/public/free-scans/${token}`),
+  screenshotUrl: (token: string) => `${API_ORIGIN}/public/free-scans/${token}/screenshot`,
+  claim: (token: string, organizationId: string) =>
+    api<{ projectId: string; runId: string; alreadyClaimed: boolean }>(`/free-scans/${token}/claim`, {
+      method: 'POST',
+      body: JSON.stringify({ organizationId }),
+    }),
 };

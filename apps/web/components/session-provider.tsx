@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { identify, resetAnalytics } from '@/lib/analytics';
 import { ApiError } from '@/lib/api';
 import { authApi, orgApi } from '@/lib/queries';
 import type { Organization, SessionUser } from '@auditor/shared';
@@ -50,21 +51,29 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const isLanding = pathname === '/';
     const isAuthForm = pathname === '/login' || pathname === '/register';
-    const isSharedReport = pathname.startsWith('/r/');
+    const isSharedReport = pathname.startsWith('/r/') || pathname.startsWith('/check/');
     // Reachable without signing in: password and email links, and the legal pages.
     const isOpenPage = ['/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy', '/refunds', '/film'].includes(pathname);
     const publicPath = isLanding || isAuthForm || isSharedReport || isOpenPage;
     if (me.isLoading) {
       return;
     }
+    // A free check waiting to be saved travels with the user through sign-in.
+    const scan = new URLSearchParams(window.location.search).get('scan');
+    const scanQuery = scan ? `?scan=${encodeURIComponent(scan)}` : '';
     if (signedOut && !publicPath) {
-      router.replace('/login');
+      router.replace(`/login${scanQuery}`);
     }
     // Keep marketing `/` reachable when signed in; only bounce auth forms.
+    // With a free check to save, or a brand-new account, the welcome page takes over.
     if (me.data && isAuthForm) {
-      router.replace('/dashboard');
+      router.replace(scan || pathname === '/register' ? `/welcome${scanQuery}` : '/dashboard');
     }
   }, [me.data, me.isLoading, signedOut, pathname, router]);
+
+  useEffect(() => {
+    if (me.data) identify(me.data.id);
+  }, [me.data]);
 
   const currentOrg = useMemo(() => {
     const list = orgs.data ?? [];
@@ -74,6 +83,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const logoutMutation = useMutation({
     mutationFn: authApi.logout,
     onSuccess: async () => {
+      resetAnalytics();
       await queryClient.clear();
       router.replace('/login');
     },

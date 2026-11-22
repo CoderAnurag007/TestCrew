@@ -10,6 +10,7 @@ import { AuthLayout, FormError } from '@/components/pages/auth-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { track } from '@/lib/analytics';
 import { authApi } from '@/lib/queries';
 import { ApiError } from '@/lib/api';
 
@@ -20,17 +21,26 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // A free check to save after signing in (from /check/<token>).
+  const [scan, setScan] = useState<string | null>(null);
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has('reset')) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('reset')) {
       setNotice('Password changed. Sign in with your new password.');
+    }
+    const token = params.get('scan');
+    if (token) {
+      setScan(token);
+      setNotice('Sign in to save your free check and see the full report.');
     }
   }, []);
 
   const mutation = useMutation({
     mutationFn: authApi.login,
     onSuccess: async () => {
+      track('logged_in', { withFreeCheck: Boolean(scan) });
       await queryClient.invalidateQueries({ queryKey: ['me'] });
-      router.replace('/dashboard');
+      router.replace(scan ? `/welcome?scan=${encodeURIComponent(scan)}` : '/dashboard');
       router.refresh();
     },
     onError: (err) => {
@@ -47,7 +57,7 @@ export default function LoginPage() {
       footer={
         <>
           New to Snaghunt?{' '}
-          <Link className="font-medium text-cobalt underline-offset-4 hover:underline" href="/register">
+          <Link className="font-medium text-cobalt underline-offset-4 hover:underline" href={scan ? `/register?scan=${encodeURIComponent(scan)}` : '/register'}>
             Create an account
           </Link>
         </>

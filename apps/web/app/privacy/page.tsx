@@ -16,6 +16,8 @@ export default function PrivacyPage() {
           <li><strong>Workspace data:</strong> the sites you add, settings, schedules, alert and ticket settings, and who is a member.</li>
           <li><strong>Audit results:</strong> what the automated browser sees on the sites you audit: page addresses, page text and structure, screenshots, console messages, network errors, test results and findings. This can include personal data that is visible on those pages.</li>
           <li><strong>Secrets you give us:</strong> logins or saved sessions for audited sites, and tokens for GitHub, Jira, Linear or Slack. These are encrypted at rest and used only to run your audits and create your tickets and alerts.</li>
+          <li><strong>Free checks:</strong> when you check a site from the home page without an account, we keep the address, the results and a scrambled (hashed) version of your IP address, used only to limit how many free checks one visitor can run.</li>
+          <li><strong>Product usage:</strong> which pages and features of the app are used (for example “started an audit”), tied to an account id, never your name or email. Links to shared reports are removed first.</li>
           <li><strong>Usage and security logs:</strong> sign-ins, important account actions, IP addresses and errors, so we can keep the service secure and fix problems.</li>
           <li><strong>Billing:</strong> handled by our payment provider. We see your plan and payment status, not your full card number.</li>
         </ul>
@@ -26,6 +28,7 @@ export default function PrivacyPage() {
           <li>To run the service: audit your sites, store and show results, send the alerts and tickets you set up.</li>
           <li>To run your account: sign-in, email confirmation, password resets, billing and support.</li>
           <li>To keep it secure and working: preventing abuse, fixing errors, enforcing plan limits.</li>
+          <li>To improve the product: seeing which steps people get stuck on, from the first free check to a finished report.</li>
           <li>To tell you about important changes to the service or these policies.</li>
         </ul>
         <p>We don’t sell personal data, and we don’t use your audit results to train AI models.</p>
@@ -37,6 +40,7 @@ export default function PrivacyPage() {
           <li>Hosting and storage, where the app, database and screenshots live.</li>
           <li>AI model providers (currently Google Gemini), which receive page text and screenshots from your audits to help write tests and review pages.</li>
           <li>Email delivery, for account emails and alerts.</li>
+          <li>Product analytics (PostHog), which receives the product usage above. It doesn’t receive your name, email or audit results.</li>
           <li>Payments, for subscriptions and invoices.</li>
           <li>The tools you connect yourself (Slack, GitHub, Jira, Linear, webhooks), which receive the findings you send them.</li>
         </ul>
@@ -48,6 +52,7 @@ export default function PrivacyPage() {
           <li>Account and workspace data: while your account exists.</li>
           <li>Audit results and screenshots: while the project exists, or until you delete them.</li>
           <li>When you delete a project or your account, its audits, findings and screenshots are deleted. Backups roll over within 30 days.</li>
+          <li>Free checks nobody saves to an account: 14 days.</li>
           <li>Security logs: up to 12 months.</li>
         </ul>
       </Section>
@@ -55,7 +60,9 @@ export default function PrivacyPage() {
       <Section title="Cookies and storage">
         <p>
           We use one cookie to keep you signed in. The app also remembers small preferences in your browser (such as your
-          current workspace and whether the welcome guide is hidden). We don’t use advertising or tracking cookies.
+          current workspace and whether the welcome guide is hidden). Product analytics keeps a random visitor id in your
+          browser’s storage, not in a cookie, and is switched off if your browser sends Do Not Track. We don’t use advertising
+          or tracking cookies.
         </p>
       </Section>
 

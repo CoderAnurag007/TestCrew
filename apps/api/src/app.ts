@@ -14,6 +14,7 @@ import { MemoryRunQueue, MemorySessionStore, type RunQueuePort, type SessionStor
 import { registerAccountRoutes } from './modules/auth/account.js';
 import { registerAuthRoutes } from './modules/auth/routes.js';
 import { registerCredentialRoutes } from './modules/credentials/routes.js';
+import { registerFreeScanRoutes } from './modules/free-scans/routes.js';
 import { registerLaunchRoutes } from './modules/launch/routes.js';
 import { registerDashboardRoutes } from './modules/dashboard/routes.js';
 import { registerEnvironmentRoutes } from './modules/environments/routes.js';
@@ -129,6 +130,7 @@ export async function buildApp(env: ApiEnv = loadApiEnv()) {
   await registerTokenRoutes(app);
   await registerDashboardRoutes(app);
   await registerLaunchRoutes(app);
+  await registerFreeScanRoutes(app);
 
   app.addHook('onClose', async () => {
     await runQueue.close();

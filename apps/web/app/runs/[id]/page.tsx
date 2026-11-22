@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { isLiveRunStatus, type FindingSeverity, type FindingStatus } from '@auditor/shared';
@@ -42,10 +42,12 @@ import { RunContextStrip } from '@/components/run/run-context-strip';
 import { RunHeader } from '@/components/run/run-header';
 import { asRecord, countOf, formatBytes, formatDuration, SEVERITY_ORDER } from '@/components/run/run-utils';
 import { TestsList } from '@/components/run/tests-list';
+import { WelcomeBanner } from '@/components/run/welcome-banner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, Skeleton } from '@/components/ui/premium';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { track } from '@/lib/analytics';
 import { ApiError } from '@/lib/api';
 import { runApi } from '@/lib/queries';
 
@@ -97,6 +99,14 @@ export default function RunDetailPage() {
     onError: (error) => toast.error(error instanceof ApiError ? error.message : 'Could not update finding'),
   });
 
+  // Analytics: a finished report was opened (once per run per page view).
+  const viewed = useRef<string | null>(null);
+  useEffect(() => {
+    if (data?.status !== 'COMPLETED' || viewed.current === runId) return;
+    viewed.current = runId;
+    track('report_viewed', { designOnly: data.bugAudit === false, findings: data.findings?.length ?? 0 });
+  }, [data, runId]);
+
   const allFindings = useMemo(() => data?.findings ?? [], [data?.findings]);
   const openFindings = allFindings.filter((item) => !item.suppressed);
   const payload = asRecord(data?.reportPayload ?? data?.report?.payload);
@@ -126,6 +136,7 @@ export default function RunDetailPage() {
   return (
     <AppShell>
       <RunHeader runId={runId} run={data} />
+      <WelcomeBanner live={live} designOnly={designOnly} projectId={data?.projectId} />
 
       {run.isError && !data ? (
         <EmptyState

@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/premium';
+import { track } from '@/lib/analytics';
 import { ApiError } from '@/lib/api';
 import { runApi, type ProjectDetail } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -104,6 +105,7 @@ export function useStartAudit(projectId: string, project: ProjectDetail | undefi
         designReview: choice?.designReview,
       }),
     onSuccess: async (run) => {
+      track('audit_started', { first: false, type: run.bugAudit === false ? 'design' : run.designReview ? 'full' : 'bugs', device: run.device });
       await queryClient.invalidateQueries({ queryKey: ['runs', projectId] });
       await queryClient.invalidateQueries({ queryKey: ['onboarding'] });
       toast.success(run.bugAudit === false ? 'Design review queued' : 'Audit queued');

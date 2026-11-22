@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { currentDevice, deviceContextOptions, runWithDevice } from '@auditor/browser';
-import { alertSubject, alertText, monitorDevices, slackPayload, type AlertMessage } from '../src/monitor.js';
+import {
+  alertSubject,
+  alertText,
+  FREE_SCAN_RETENTION_DAYS,
+  monitorDevices,
+  pruneUnclaimedFreeScans,
+  slackPayload,
+  type AlertMessage,
+} from '../src/monitor.js';
 
 const message: AlertMessage = {
   kind: 'bugs',
@@ -60,5 +68,44 @@ describe('devices', () => {
     const options = await runWithDevice('fridge', async () => deviceContextOptions({ viewport: { width: 1024, height: 700 } }));
     expect(options.viewport).toEqual({ width: 1024, height: 700 });
     expect(currentDevice()).toBe('desktop');
+  });
+});
+
+describe('free check cleanup', () => {
+  it('deletes unclaimed free checks that have finished, with their stored files', async () => {
+    const deletedProjects: string[][] = [];
+    const deletedPrefixes: string[] = [];
+    let where: unknown;
+    const deps = {
+      prisma: {
+        freeScan: {
+          findMany: async (args: { where: unknown }) => {
+            where = args.where;
+            return [
+              { runId: 'run1', run: { projectId: 'p1', status: 'COMPLETED' } },
+              { runId: 'run2', run: { projectId: 'p2', status: 'FAILED' } },
+              { runId: 'run3', run: { projectId: 'p3', status: 'EXPLORING' } },
+            ];
+          },
+        },
+        project: {
+          deleteMany: async (args: { where: { id: { in: string[] } } }) => {
+            deletedProjects.push(args.where.id.in);
+            return { count: args.where.id.in.length };
+          },
+        },
+      },
+      storage: {
+        deletePrefix: async (prefix: string) => {
+          deletedPrefixes.push(prefix);
+        },
+      },
+    } as unknown as Parameters<typeof pruneUnclaimedFreeScans>[0];
+
+    const now = new Date('2026-12-01T00:00:00Z');
+    expect(await pruneUnclaimedFreeScans(deps, now)).toBe(2);
+    expect(where).toEqual({ claimedAt: null, createdAt: { lt: new Date(now.getTime() - FREE_SCAN_RETENTION_DAYS * 86_400_000) } });
+    expect(deletedProjects).toEqual([['p1', 'p2']]);
+    expect(deletedPrefixes).toEqual(['runs/run1/', 'runs/run2/']);
   });
 });

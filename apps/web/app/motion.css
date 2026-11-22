@@ -476,3 +476,29 @@ html.reveal-ready [data-reveal][data-shown] > * {
     transition: none;
   }
 }
+
+/* Free check field: each example address rises in, then gives way to the next. */
+.free-check-example {
+  display: inline-block;
+  animation: free-check-example 2.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes free-check-example {
+  0% {
+    opacity: 0;
+    transform: translateY(60%);
+  }
+  12%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-45%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .free-check-example {
+    animation: none;
+  }
+}

@@ -373,12 +373,33 @@ model Run {
   report       Report?
   events       RunEvent[]
   aiUsages     AiUsage[]
+  freeScan     FreeScan?
 
   @@index([organizationId])
   @@index([projectId, createdAt])
   @@index([status])
 
   @@index([status, createdAt])
+}
+
+/// A no-sign-up check started from the landing page. Its run lives in the free-scans
+/// system workspace until someone signs up and claims it into their own workspace.
+model FreeScan {
+  id                    String    @id @default(cuid())
+  token                 String    @unique
+  url                   String
+  host                  String
+  /// Salted hash of the visitor IP, for the per-visitor daily limit.
+  ipHash                String
+  runId                 String    @unique
+  claimedAt             DateTime?
+  claimedOrganizationId String?
+  createdAt             DateTime  @default(now())
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([ipHash, createdAt])
+  @@index([createdAt])
 }
 
 model RunStage {

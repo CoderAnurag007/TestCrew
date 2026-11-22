@@ -470,7 +470,8 @@ async function executeAuditRunOnDevice(
       blockedPathPatterns: asStringArray(run.project.blockedPathPatterns),
     };
     // A fast first look so the first snags show up within minutes; the full audit follows.
-    if (!run.replayOfRunId && run.bugAudit) {
+    // A free check from the landing page gets it too, with the design review and no crawl.
+    if (!run.replayOfRunId && (run.bugAudit || run.trigger === 'free')) {
       livePhase = 'quick scan';
       await runQuickScan(deps, {
         runId: run.id,

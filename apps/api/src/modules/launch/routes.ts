@@ -325,10 +325,11 @@ export async function registerLaunchRoutes(app: FastifyInstance, send: Fetch = f
     });
     const order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
     findings.sort((a, b) => order.indexOf(a.severity) - order.indexOf(b.severity));
+    // White-label plans show the agency's brand and no mention of Snaghunt.
+    const whiteLabel = (await getUsage(app.prisma, run.organizationId)).limits.branding;
     const report: PublicReport = {
-      brand: (await getUsage(app.prisma, run.organizationId)).limits.branding
-        ? brandView(run.organization)
-        : { name: 'Snaghunt', logoUrl: null, color: null, footer: null },
+      brand: whiteLabel ? brandView(run.organization) : { name: 'Snaghunt', logoUrl: null, color: null, footer: null },
+      poweredBy: !whiteLabel,
       project: { name: run.project.name, baseUrl: run.baseUrlOverride ?? run.environment?.baseUrl ?? run.project.baseUrl },
       run: {
         status: run.status,

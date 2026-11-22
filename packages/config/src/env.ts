@@ -58,6 +58,9 @@ export const apiEnvSchema = z.object({
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: z.string().optional(),
+  /** Free checks from the landing page (no sign-up): most per day in total, and per visitor. */
+  FREE_SCAN_DAILY_LIMIT: z.coerce.number().int().min(0).default(200),
+  FREE_SCAN_PER_VISITOR: z.coerce.number().int().min(0).default(3),
 });
 
 export type ApiEnv = {
@@ -83,6 +86,8 @@ export type ApiEnv = {
   S3_ACCESS_KEY_ID: string | undefined;
   S3_SECRET_ACCESS_KEY: string | undefined;
   S3_FORCE_PATH_STYLE: boolean;
+  FREE_SCAN_DAILY_LIMIT: number;
+  FREE_SCAN_PER_VISITOR: number;
 };
 
 const blank = (value: string | undefined) => (value === '' ? undefined : value);

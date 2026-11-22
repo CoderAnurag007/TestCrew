@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { PLAN_ORDER, PLANS, TRIAL_DAYS, type PlanId } from '@auditor/shared';
+import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { SectionIndex } from './section-index';
 
@@ -71,7 +72,7 @@ export function PricingSection({ signedIn }: { signedIn: boolean }) {
       <div className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 lg:px-10 lg:py-28">
         <div data-reveal className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <SectionIndex number="0.05" label="Pricing" />
+            <SectionIndex number="0.06" label="Pricing" />
             <h2 className="display mt-6 text-[32px] sm:text-[44px]">Priced per site</h2>
             <p className="mt-5 max-w-[46ch] text-[15px] leading-relaxed text-[var(--night-dim)]">
               Every plan starts with {TRIAL_DAYS} days of Pro, free and without a card. Less than one lost sale a month.
@@ -138,6 +139,7 @@ export function PricingSection({ signedIn }: { signedIn: boolean }) {
                 </ul>
                 <Link
                   href={start}
+                  onClick={() => track('pricing_cta_clicked', { plan: id, billing, currency })}
                   className={cn(
                     'mt-8 inline-flex h-10 items-center justify-center rounded-full px-4 text-sm font-medium transition-colors',
                     featured || id === 'PRO'

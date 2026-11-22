@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-provider';
 import { Brand } from '@/components/shell/brand';
+import { CaseStudySection } from './case-study-section';
 import { CtaSection } from './cta-section';
 import { EvidenceSection } from './evidence-section';
 import { FeaturesSection } from './features-section';
@@ -57,9 +58,10 @@ export function LandingPage() {
         <HeroSection primaryHref={primaryHref} primaryLabel={primaryLabel} signedIn={signedIn} />
         <HowItWorksSection />
         <EvidenceSection />
+        <CaseStudySection />
         <FeaturesSection />
         <PricingSection signedIn={signedIn} />
-        <CtaSection primaryHref={primaryHref} primaryLabel={primaryLabel} />
+        <CtaSection primaryHref={primaryHref} primaryLabel={primaryLabel} signedIn={signedIn} />
       </main>
       <footer>
         <div className="mx-auto flex max-w-[1280px] flex-col items-start justify-between gap-4 px-4 py-8 sm:flex-row sm:items-center sm:px-6 lg:px-10">

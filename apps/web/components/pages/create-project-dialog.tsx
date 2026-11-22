@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ApiError } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { projectApi } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
@@ -49,6 +50,7 @@ export function CreateProjectDialog({
   const create = useMutation({
     mutationFn: projectApi.create,
     onSuccess: async (project) => {
+      track('site_added', { first: false });
       await queryClient.invalidateQueries({ queryKey: ['projects', organizationId] });
       await queryClient.invalidateQueries({ queryKey: ['stats', organizationId] });
       await queryClient.invalidateQueries({ queryKey: ['onboarding', organizationId] });

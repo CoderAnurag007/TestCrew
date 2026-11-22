@@ -1,10 +1,12 @@
 'use client';
 
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import { ThemeProvider } from '@/components/theme';
+import { initAnalytics, trackPageview } from '@/lib/analytics';
 import { ApiError } from '@/lib/api';
 
 /**
@@ -30,7 +32,7 @@ function createClient(): QueryClient {
     if (!(error instanceof ApiError) || error.status !== 401 || isSessionCheck) {
       return;
     }
-    if (!notified && typeof window !== 'undefined' && !['/login', '/register', '/', '/forgot-password', '/reset-password', '/verify-email'].includes(window.location.pathname)) {
+    if (!notified && typeof window !== 'undefined' && !['/login', '/register', '/', '/forgot-password', '/reset-password', '/verify-email'].includes(window.location.pathname) && !window.location.pathname.startsWith('/check/')) {
       notified = true;
       toast.error('Your session ended. Please sign in again.');
       setTimeout(() => {
@@ -43,12 +45,25 @@ function createClient(): QueryClient {
   return client;
 }
 
+/** Starts analytics (when configured) and records each page the user opens. */
+function PageviewTracker() {
+  const pathname = usePathname();
+  useEffect(() => {
+    initAnalytics();
+  }, []);
+  useEffect(() => {
+    trackPageview();
+  }, [pathname]);
+  return null;
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(createClient);
 
   return (
     <ThemeProvider>
       <QueryClientProvider client={client}>
+        <PageviewTracker />
         {children}
         <Toaster />
       </QueryClientProvider>

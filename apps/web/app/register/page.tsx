@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { AuthLayout, FormError } from '@/components/pages/auth-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { track } from '@/lib/analytics';
 import { authApi } from '@/lib/queries';
 import { ApiError } from '@/lib/api';
 
@@ -22,12 +23,19 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // A free check to save into the new account (from /check/<token>).
+  const [scan, setScan] = useState<string | null>(null);
+  useEffect(() => {
+    setScan(new URLSearchParams(window.location.search).get('scan'));
+  }, []);
 
   const mutation = useMutation({
     mutationFn: authApi.register,
     onSuccess: async () => {
+      track('signed_up', { via: scan ? 'free_check' : 'direct' });
       await queryClient.invalidateQueries({ queryKey: ['me'] });
-      router.replace('/dashboard');
+      // New accounts go through the welcome flow: add the site and start the first audit.
+      router.replace(scan ? `/welcome?scan=${encodeURIComponent(scan)}` : '/welcome');
     },
     onError: (err) => {
       const message = err instanceof ApiError ? err.message : 'Unable to register';
@@ -40,12 +48,16 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Create your account"
-      description="Set up an account, then add your website and start your first audit."
+      title={scan ? 'Save your free check' : 'Create your account'}
+      description={
+        scan
+          ? 'Create a free account to see every issue with its screenshot and fix. Your check is saved to it.'
+          : 'Set up an account, then add your website and start your first audit.'
+      }
       footer={
         <>
           Already have an account?{' '}
-          <Link className="font-medium text-cobalt underline-offset-4 hover:underline" href="/login">
+          <Link className="font-medium text-cobalt underline-offset-4 hover:underline" href={scan ? `/login?scan=${encodeURIComponent(scan)}` : '/login'}>
             Sign in
           </Link>
         </>

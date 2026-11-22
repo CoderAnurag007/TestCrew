@@ -47,7 +47,12 @@ CMD ["pnpm", "--filter", "@auditor/worker", "start"]
 FROM deps AS web-build
 # Baked into the browser bundle at build time.
 ARG NEXT_PUBLIC_API_URL
+# Optional product analytics (PostHog); off when the key is empty.
+ARG NEXT_PUBLIC_POSTHOG_KEY=
+ARG NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
+    NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY} \
+    NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST} \
     NEXT_TELEMETRY_DISABLED=1
 RUN test -n "$NEXT_PUBLIC_API_URL" || (echo "Set --build-arg NEXT_PUBLIC_API_URL=https://api.your-domain" && exit 1)
 RUN pnpm --filter @auditor/web build

@@ -213,6 +213,8 @@ export const publicReportSchema = z.object({
     color: z.string().nullable(),
     footer: z.string().nullable(),
   }),
+  /** Show the "Checked by Snaghunt" footer and free-check link (hidden on white-label plans). */
+  poweredBy: z.boolean().optional(),
   project: z.object({ name: z.string(), baseUrl: z.string() }),
   run: z.object({
     status: z.string(),

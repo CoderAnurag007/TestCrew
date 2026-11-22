@@ -13,7 +13,7 @@ export const LEGAL = {
   jurisdiction: '[Country and state whose courts and laws apply]',
   email: 'hello@snaghunt.com',
   website: 'snaghunt.com',
-  updated: '21 November 2026',
+  updated: '22 November 2026',
 };
 
 const PAGES = [

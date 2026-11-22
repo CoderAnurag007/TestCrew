@@ -8,6 +8,7 @@ import { AppShell } from '@/components/layout/app-shell';
 import { useSession } from '@/components/session-provider';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { planApi, type UsageView } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
@@ -51,7 +52,10 @@ function PlanView({ orgId, usage }: { orgId: string; usage: UsageView }) {
   const trial = usage.plan === 'FREE' && usage.effectivePlan !== 'FREE';
   const current = PLANS[usage.effectivePlan];
   const change = useMutation({
-    mutationFn: (plan: PlanId) => planApi.setPlan(orgId, plan),
+    mutationFn: (plan: PlanId) => {
+      track('upgrade_clicked', { from: usage.effectivePlan, to: plan });
+      return planApi.setPlan(orgId, plan);
+    },
     onSuccess: async (data) => {
       queryClient.setQueryData(['usage', orgId], data);
       toast.success(`Switched to ${PLANS[data.plan].name}`);

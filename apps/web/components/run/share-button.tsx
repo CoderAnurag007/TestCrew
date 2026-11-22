@@ -9,6 +9,7 @@ import { CopyButton } from '@/components/copy-button';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { track } from '@/lib/analytics';
 import { ApiError } from '@/lib/api';
 import { launchApi } from '@/lib/queries';
 
@@ -22,6 +23,7 @@ export function ShareButton({ runId, projectId, shareToken }: { runId: string; p
   const share = useMutation({
     mutationFn: () => launchApi.share(runId),
     onSuccess: async () => {
+      track('share_link_created');
       await queryClient.invalidateQueries({ queryKey: ['run', runId] });
     },
     onError: (error) => toast.error(error instanceof ApiError ? error.message : 'Could not create the link'),
